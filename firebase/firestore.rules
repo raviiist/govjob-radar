@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// GovJob Radar — Firestore security rules.
+// Replace YOUR_ADMIN_GMAIL@gmail.com below (one place) with your own Gmail, then paste the
+// whole file into Firebase console > Firestore Database > Rules > Publish.
+//
+// - The nightly server uses a service account and is not limited by these rules.
+// - Phones sign in anonymously and may ONLY create small problem reports.
+// - Only the admin Gmail can read the review queue, errors and status, and approve/reject jobs.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'YOUR_ADMIN_GMAIL@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    match /jobs/{id} {
+      allow read: if isAdmin();
+      // Admin may change only these fields (must match ADMIN_FIELDS in server/govjob/store.py).
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'status', 'title', 'last_date', 'total_vacancies', 'sector', 'level', 'state', 'kind',
+             'summary', 'review_note', 'reviewed_at', 'admin_updated_at', 'admin_locked',
+             'extended', 'extension_history', 'pending_extension', 'review_reasons', 'extension_checks'])
+        && request.resource.data.status in ['live', 'pending_review', 'rejected', 'closed',
+                                            'awaiting_extension_check', 'link_broken'];
+    }
+
+    match /errors/{id} {
+      allow read: if isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved', 'resolved_at', 'resolved_by']);
+      allow delete: if isAdmin();
+    }
+
+    match /app_reports/{id} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['code', 'message', 'severity', 'app_version', 'android',
+                                                 'device', 'created_at', 'job_id', 'uid', 'resolved'])
+        && request.resource.data.code is string && request.resource.data.code.size() <= 40
+        && request.resource.data.message is string && request.resource.data.message.size() <= 4000
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.resolved == false;
+      allow read, delete: if isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved']);
+    }
+
+    match /status/{id} { allow read: if isAdmin(); }
+    match /sources/{id} { allow read: if isAdmin(); }
+    match /config/{id} {
+      allow read: if isAdmin();
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['auto_publish', 'review_new_sources', 'new_source_days']);
+    }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

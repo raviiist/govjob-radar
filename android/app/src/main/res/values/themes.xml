@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.GovJobRadar" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#0B5563</item>
+        <item name="android:windowBackground">@color/bg</item>
+    </style>
+</resources>

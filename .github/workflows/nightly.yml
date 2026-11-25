@@ -1,0 +1,55 @@
+name: nightly
+
+# Every night ~02:11 IST: crawl official sources, read new notices with AI, check
+# extensions and links, then publish the feed. Anything that goes wrong is written
+# to Admin > Errors in the app.
+on:
+  schedule:
+    - cron: "41 20 * * *"        # 20:41 UTC = 02:11 IST
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Optional: space-separated source ids to crawl (blank = all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 170
+    env:
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+      AI_MAX_CALLS: ${{ vars.AI_MAX_CALLS || '300' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: server/requirements.txt
+      - name: Install
+        run: pip install -r server/requirements.txt pytest lxml
+      - name: Self-test
+        run: python -m pytest -q server/tests
+      - name: Crawl
+        run: python server/run_nightly.py ${{ inputs.only && format('--only {0}', inputs.only) || '' }}
+      - name: Report failure to Admin tab
+        if: failure()
+        run: python server/report_failure.py nightly
+
+  publish:
+    needs: crawl
+    if: always()
+    uses: ./.github/workflows/publish.yml
+    secrets: inherit

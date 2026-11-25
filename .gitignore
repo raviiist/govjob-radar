@@ -1,0 +1,17 @@
+# never commit signing keys or service-account files
+*.jks
+*.keystore
+signing-key/
+service-account*.json
+*.p12
+# build
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+.idea/
+*.iml
+__pycache__/
+.pytest_cache/
+server/local-state.json
+_site/

@@ -1,0 +1,159 @@
+package com.dhruvaxtechnologies.govjobradar.ui
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.dhruvaxtechnologies.govjobradar.data.Catalog
+import com.dhruvaxtechnologies.govjobradar.data.Eligibility
+import com.dhruvaxtechnologies.govjobradar.data.Job
+import com.dhruvaxtechnologies.govjobradar.data.Profile
+import com.dhruvaxtechnologies.govjobradar.ui.theme.Danger
+import com.dhruvaxtechnologies.govjobradar.ui.theme.Ok
+import com.dhruvaxtechnologies.govjobradar.ui.theme.Warn
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+
+val DATE_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy")
+fun fmtDate(iso: String?): String = iso?.let { runCatching { LocalDate.parse(it.take(10)).format(DATE_FMT) }.getOrNull() } ?: "—"
+
+fun openUrl(context: Context, url: String?) {
+    if (url.isNullOrBlank()) return
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+}
+
+@Composable
+fun Badge(text: String, bg: Color, fg: Color = Color.White) {
+    Text(text, color = fg, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(bg).padding(horizontal = 8.dp, vertical = 3.dp))
+}
+
+@Composable
+fun SoftChip(text: String) {
+    Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 7.dp, vertical = 3.dp))
+}
+
+@Composable
+fun deadlineColor(days: Long?): Color = when {
+    days == null -> MaterialTheme.colorScheme.onSurfaceVariant
+    days < 0 -> MaterialTheme.colorScheme.onSurfaceVariant
+    days <= 3 -> Danger
+    days <= 7 -> Warn
+    else -> Ok
+}
+
+fun deadlineText(job: Job): String {
+    val d = job.daysLeft() ?: return "Last date: see notice"
+    return when {
+        job.awaitingExtension || d < 0 -> "Closed ${fmtDate(job.lastDate)}"
+        d == 0L -> "Last date TODAY"
+        d == 1L -> "Last date tomorrow"
+        else -> "$d days left · ${fmtDate(job.lastDate)}"
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun JobCard(job: Job, profile: Profile, saved: Boolean, onSave: () -> Unit, onClick: () -> Unit) {
+    val sector = Catalog.sector(job.sector)
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp),
+    ) {
+        Row(Modifier.height(IntrinsicSize.Min)) {
+            Box(Modifier.width(5.dp).fillMaxHeight().background(sector.tint))
+            Column(Modifier.padding(12.dp).weight(1f)) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Column(Modifier.weight(1f)) {
+                        Text(job.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(job.organisation + (job.state?.let { " · $it" } ?: ""), style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    IconButton(onClick = onSave, modifier = Modifier.size(36.dp)) {
+                        Icon(if (saved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                            contentDescription = if (saved) "Saved" else "Save", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (job.isNew()) Badge("NEW", MaterialTheme.colorScheme.primary)
+                    if (job.extended) Badge("DATE EXTENDED", Warn)
+                    if (job.awaitingExtension) Badge("CHECKING EXTENSION", MaterialTheme.colorScheme.outline)
+                    if (job.isDeputation) Badge("DEPUTATION", Color(0xFF6A1B9A))
+                    when (Eligibility.likelyEligible(job, profile)) {
+                        true -> Badge("LIKELY ELIGIBLE", Ok)
+                        else -> {}
+                    }
+                    job.totalVacancies?.let { SoftChip("$it posts") }
+                    job.payLevelMin?.let { lo -> SoftChip(if (job.payLevelMax != null && job.payLevelMax != lo) "Level $lo–${job.payLevelMax}" else "Level $lo") }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(deadlineText(job), color = deadlineColor(job.daysLeft()), style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyState(title: String, text: String) {
+    Column(Modifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(Icons.Outlined.Inbox, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+        Spacer(Modifier.height(10.dp))
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun SectionTitle(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.titleMedium, modifier = modifier.padding(start = 16.dp, top = 14.dp, bottom = 6.dp))
+}
+
+@Composable
+fun InfoBanner(text: String, color: Color, onClick: (() -> Unit)? = null) {
+    Surface(color = color.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)
+            .let { if (onClick != null) it.clickable { onClick() } else it }) {
+        Text(text, Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+    }
+}

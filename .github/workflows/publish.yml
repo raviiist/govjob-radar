@@ -1,0 +1,60 @@
+name: publish
+
+# Builds the public job feed from Firestore and deploys it to GitHub Pages.
+# Runs every 2 hours (so jobs you approve in Admin > Review go live within ~2 h)
+# and right after the nightly crawl.
+on:
+  schedule:
+    - cron: "23 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Publish even if the number of jobs dropped sharply"
+        type: boolean
+        default: false
+  workflow_call:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: server/requirements.txt
+      - run: pip install -r server/requirements.txt
+      - name: Build feed
+        run: >
+          python server/run_publish.py --out _site
+          --feed-base "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          ${{ inputs.force && '--force' || '' }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Report failure to Admin tab
+        if: failure()
+        run: python server/report_failure.py publish
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

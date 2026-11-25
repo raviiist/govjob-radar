@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- radar rings -->
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="2.5" android:strokeAlpha="0.55"
+        android:pathData="M54,54m-24,0a24,24 0,1 1,48 0a24,24 0,1 1,-48 0"/>
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="2.5" android:strokeAlpha="0.8"
+        android:pathData="M54,54m-15,0a15,15 0,1 1,30 0a15,15 0,1 1,-30 0"/>
+    <!-- sweep -->
+    <path android:fillColor="#E8A33D" android:fillAlpha="0.85"
+        android:pathData="M54,54 L54,30 A24,24 0 0,1 74.8,42 Z"/>
+    <!-- centre and target blip -->
+    <path android:fillColor="#FFFFFF" android:pathData="M54,54m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0"/>
+    <path android:fillColor="#FFC56E" android:pathData="M66,40m-3.5,0a3.5,3.5 0,1 1,7 0a3.5,3.5 0,1 1,-7 0"/>
+</vector>

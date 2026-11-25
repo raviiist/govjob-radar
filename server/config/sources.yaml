@@ -1,0 +1,147 @@
+# Official sources crawled every night.
+#
+# You do NOT need to keep the "hints" URLs up to date: if a hint stops working,
+# the crawler opens the home page and finds the recruitment / careers page again
+# on its own (and remembers it). Only add or remove whole sources here.
+#
+# Fields:
+#   id      unique short id (never change it after first run)
+#   name    shown in the app
+#   level   central | state
+#   state   state name (state sources only)
+#   sector  defence | police | space_research | railways | banking | civil_services | ssc |
+#           psu | teaching | health | postal | judiciary | engineering | other
+#           (default sector; the AI can still classify each notice differently)
+#   kind    recruitment | deputation | mixed  (mixed = the AI decides per notice)
+#   home    official home page
+#   hints   optional likely listing pages (tried first)
+#   domains extra official domains this source may link to (its own domain is always allowed)
+#
+# NOTE: these URLs were written from knowledge, not tested from the build machine.
+# Any that are wrong or blocked will show up in the app's Admin > Errors tab after
+# the first night, with the reason.
+
+defaults:
+  # Domains every source may link to (official government suffixes)
+  official_suffixes: [".gov.in", ".nic.in", ".ac.in", ".res.in", ".edu.in", ".mil.in", ".org.in"]
+  max_new_notices_per_source: 20
+  max_age_days: 120
+
+sources:
+  # ---------------- Central: commissions & aggregators ----------------
+  - {id: upsc, name: "UPSC", level: central, sector: civil_services, kind: mixed,
+     home: "https://upsc.gov.in", hints: ["https://upsc.gov.in/recruitment/recruitment-advertisement", "https://upsc.gov.in/examinations/active-examinations"]}
+  - {id: ssc, name: "Staff Selection Commission", level: central, sector: ssc, kind: recruitment,
+     home: "https://ssc.gov.in"}
+  - {id: employment_news, name: "Employment News", level: central, sector: other, kind: mixed,
+     home: "https://www.employmentnews.gov.in"}
+  - {id: dopt, name: "DoPT (vacancy circulars)", level: central, sector: civil_services, kind: deputation,
+     home: "https://dopt.gov.in"}
+  - {id: ncs, name: "National Career Service", level: central, sector: other, kind: recruitment,
+     home: "https://www.ncs.gov.in"}
+
+  # ---------------- Space, research, atomic ----------------
+  - {id: isro, name: "ISRO", level: central, sector: space_research, kind: mixed,
+     home: "https://www.isro.gov.in", hints: ["https://www.isro.gov.in/Careers.html"]}
+  - {id: dos, name: "Department of Space", level: central, sector: space_research, kind: deputation,
+     home: "https://www.dos.gov.in"}
+  - {id: drdo, name: "DRDO", level: central, sector: space_research, kind: mixed,
+     home: "https://www.drdo.gov.in"}
+  - {id: barc, name: "BARC", level: central, sector: space_research, kind: mixed,
+     home: "https://www.barc.gov.in"}
+  - {id: csir, name: "CSIR", level: central, sector: space_research, kind: mixed,
+     home: "https://www.csir.res.in"}
+
+  # ---------------- Defence & paramilitary ----------------
+  - {id: army, name: "Indian Army", level: central, sector: defence, kind: recruitment,
+     home: "https://joinindianarmy.nic.in"}
+  - {id: navy, name: "Indian Navy", level: central, sector: defence, kind: recruitment,
+     home: "https://www.joinindiannavy.gov.in"}
+  - {id: iaf, name: "Indian Air Force", level: central, sector: defence, kind: recruitment,
+     home: "https://indianairforce.nic.in", domains: ["cdac.in"]}
+  - {id: mod, name: "Ministry of Defence", level: central, sector: defence, kind: deputation,
+     home: "https://www.mod.gov.in"}
+  - {id: crpf, name: "CRPF", level: central, sector: police, kind: mixed, home: "https://crpf.gov.in"}
+  - {id: bsf, name: "BSF", level: central, sector: police, kind: mixed, home: "https://bsf.gov.in"}
+  - {id: cisf, name: "CISF", level: central, sector: police, kind: mixed, home: "https://cisf.gov.in"}
+  - {id: itbp, name: "ITBP", level: central, sector: police, kind: mixed, home: "https://itbpolice.nic.in"}
+  - {id: mha, name: "Ministry of Home Affairs", level: central, sector: police, kind: deputation,
+     home: "https://www.mha.gov.in"}
+
+  # ---------------- Railways ----------------
+  - {id: indianrail, name: "Indian Railways", level: central, sector: railways, kind: mixed,
+     home: "https://indianrailways.gov.in"}
+  - {id: rrb_cdg, name: "RRB Chandigarh (CEN notices)", level: central, sector: railways, kind: recruitment,
+     home: "https://www.rrbcdg.gov.in"}
+
+  # ---------------- Banking & finance ----------------
+  - {id: rbi, name: "Reserve Bank of India", level: central, sector: banking, kind: recruitment,
+     home: "https://opportunities.rbi.org.in", domains: ["rbi.org.in"]}
+  - {id: ibps, name: "IBPS", level: central, sector: banking, kind: recruitment,
+     home: "https://www.ibps.in", domains: ["ibps.in"]}
+  - {id: sbi, name: "SBI Careers", level: central, sector: banking, kind: recruitment,
+     home: "https://sbi.co.in/web/careers", domains: ["sbi.co.in", "bank.sbi"]}
+
+  # ---------------- Other central ----------------
+  - {id: indiapost, name: "India Post", level: central, sector: postal, kind: mixed,
+     home: "https://www.indiapost.gov.in"}
+  - {id: meity, name: "MeitY", level: central, sector: engineering, kind: deputation,
+     home: "https://www.meity.gov.in"}
+  - {id: mea, name: "Ministry of External Affairs", level: central, sector: civil_services, kind: deputation,
+     home: "https://www.mea.gov.in"}
+  - {id: aiims, name: "AIIMS New Delhi", level: central, sector: health, kind: mixed,
+     home: "https://www.aiims.edu", domains: ["aiims.edu"]}
+  - {id: kvs, name: "Kendriya Vidyalaya Sangathan", level: central, sector: teaching, kind: mixed,
+     home: "https://kvsangathan.nic.in"}
+  - {id: nvs, name: "Navodaya Vidyalaya Samiti", level: central, sector: teaching, kind: mixed,
+     home: "https://navodaya.gov.in"}
+
+  # ---------------- State Public Service Commissions ----------------
+  - {id: kpsc, name: "Karnataka PSC", level: state, state: "Karnataka", sector: civil_services, kind: mixed,
+     home: "https://kpsc.kar.nic.in"}
+  - {id: tnpsc, name: "Tamil Nadu PSC", level: state, state: "Tamil Nadu", sector: civil_services, kind: mixed,
+     home: "https://www.tnpsc.gov.in"}
+  - {id: keralapsc, name: "Kerala PSC", level: state, state: "Kerala", sector: civil_services, kind: mixed,
+     home: "https://www.keralapsc.gov.in"}
+  - {id: appsc, name: "Andhra Pradesh PSC", level: state, state: "Andhra Pradesh", sector: civil_services, kind: mixed,
+     home: "https://psc.ap.gov.in"}
+  - {id: tgpsc, name: "Telangana PSC", level: state, state: "Telangana", sector: civil_services, kind: mixed,
+     home: "https://www.tspsc.gov.in"}
+  - {id: mpsc, name: "Maharashtra PSC", level: state, state: "Maharashtra", sector: civil_services, kind: mixed,
+     home: "https://mpsc.gov.in"}
+  - {id: gpsc, name: "Gujarat PSC", level: state, state: "Gujarat", sector: civil_services, kind: mixed,
+     home: "https://gpsc.gujarat.gov.in"}
+  - {id: rpsc, name: "Rajasthan PSC", level: state, state: "Rajasthan", sector: civil_services, kind: mixed,
+     home: "https://rpsc.rajasthan.gov.in"}
+  - {id: uppsc, name: "Uttar Pradesh PSC", level: state, state: "Uttar Pradesh", sector: civil_services, kind: mixed,
+     home: "https://uppsc.up.nic.in"}
+  - {id: mppsc, name: "Madhya Pradesh PSC", level: state, state: "Madhya Pradesh", sector: civil_services, kind: mixed,
+     home: "https://mppsc.mp.gov.in"}
+  - {id: bpsc, name: "Bihar PSC", level: state, state: "Bihar", sector: civil_services, kind: mixed,
+     home: "https://bpsc.bihar.gov.in"}
+  - {id: wbpsc, name: "West Bengal PSC", level: state, state: "West Bengal", sector: civil_services, kind: mixed,
+     home: "https://psc.wb.gov.in"}
+  - {id: opsc, name: "Odisha PSC", level: state, state: "Odisha", sector: civil_services, kind: mixed,
+     home: "https://www.opsc.gov.in"}
+  - {id: hpsc, name: "Haryana PSC", level: state, state: "Haryana", sector: civil_services, kind: mixed,
+     home: "https://hpsc.gov.in"}
+  - {id: ppsc, name: "Punjab PSC", level: state, state: "Punjab", sector: civil_services, kind: mixed,
+     home: "https://ppsc.gov.in"}
+  - {id: jpsc, name: "Jharkhand PSC", level: state, state: "Jharkhand", sector: civil_services, kind: mixed,
+     home: "https://www.jpsc.gov.in"}
+  - {id: cgpsc, name: "Chhattisgarh PSC", level: state, state: "Chhattisgarh", sector: civil_services, kind: mixed,
+     home: "https://psc.cg.gov.in"}
+  - {id: apsc_assam, name: "Assam PSC", level: state, state: "Assam", sector: civil_services, kind: mixed,
+     home: "https://apsc.nic.in"}
+  - {id: ukpsc, name: "Uttarakhand PSC", level: state, state: "Uttarakhand", sector: civil_services, kind: mixed,
+     home: "https://psc.uk.gov.in"}
+  - {id: hppsc, name: "Himachal Pradesh PSC", level: state, state: "Himachal Pradesh", sector: civil_services, kind: mixed,
+     home: "https://www.hppsc.hp.gov.in"}
+
+  # ---------------- State: other recruiting boards (examples; add more any time) ----------------
+  - {id: ka_kea, name: "Karnataka Examinations Authority", level: state, state: "Karnataka", sector: other, kind: recruitment,
+     home: "https://cetonline.karnataka.gov.in/kea"}
+  - {id: tn_trb, name: "Tamil Nadu Teachers Recruitment Board", level: state, state: "Tamil Nadu", sector: teaching, kind: recruitment,
+     home: "https://www.trb.tn.gov.in"}
+  - {id: up_upsssc, name: "UP Subordinate Services Selection Commission", level: state, state: "Uttar Pradesh", sector: ssc, kind: recruitment,
+     home: "https://upsssc.gov.in"}

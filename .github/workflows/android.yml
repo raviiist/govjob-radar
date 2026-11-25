@@ -1,0 +1,52 @@
+name: android
+
+# Builds the app. Debug APK always; signed release AAB + APK when the signing
+# secrets exist (ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+# ANDROID_KEY_PASSWORD). Download them from the run's "Artifacts" section.
+on:
+  push:
+    paths: ["android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          if [ -z "$KS_B64" ]; then
+            echo "No signing secrets - building unsigned debug APK only"
+            ./gradlew --no-daemon assembleDebug
+            exit 0
+          fi
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          ./gradlew --no-daemon assembleDebug assembleRelease bundleRelease \
+            -Pgjr.storeFile="$RUNNER_TEMP/upload.jks" -Pgjr.storePassword="$KS_PASS" \
+            -Pgjr.keyAlias="$KEY_ALIAS" -Pgjr.keyPassword="$KEY_PASS"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GovJobRadar-builds
+          path: |
+            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: warn
