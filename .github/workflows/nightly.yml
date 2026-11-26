@@ -12,6 +12,10 @@ on:
         description: "Optional: space-separated source ids to crawl (blank = all)"
         required: false
         default: ""
+      on_github:
+        description: "Run on GitHub's own servers instead of the India server (for testing)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -24,7 +28,10 @@ concurrency:
 
 jobs:
   crawl:
-    runs-on: ubuntu-latest
+    # Indian government sites block foreign servers, so the crawl runs on our own server in India
+    # (Oracle Cloud, Mumbai — see server/oracle-runner-setup.sh). If that server is down the job waits
+    # and Admin > Health turns red after 30 h.
+    runs-on: ${{ (inputs.on_github || vars.CRAWL_ON_GITHUB == 'true') && 'ubuntu-latest' || 'self-hosted' }}
     timeout-minutes: 170
     env:
       FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
@@ -33,13 +40,12 @@ jobs:
       AI_MAX_CALLS: ${{ vars.AI_MAX_CALLS || '300' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: server/requirements.txt
       - name: Install
-        run: pip install -r server/requirements.txt pytest lxml
+        run: |
+          python3 -m venv "$HOME/.gjr-venv"
+          "$HOME/.gjr-venv/bin/pip" install -q --upgrade pip
+          "$HOME/.gjr-venv/bin/pip" install -q -r server/requirements.txt pytest lxml
+          echo "$HOME/.gjr-venv/bin" >> "$GITHUB_PATH"
       - name: Self-test
         run: python -m pytest -q server/tests
       - name: Crawl

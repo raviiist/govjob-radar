@@ -86,12 +86,22 @@ every 2 h  "publish" again (so jobs you approve in Admin go live within ~2 h)
 - Official link checked every night; hidden after 2 failed nights, comes back automatically when it works.
 - A publish that would drop more than half of the jobs at once is refused (users keep yesterday's list) and flagged.
 
-## If many sites block GitHub's servers
+## The India server (Oracle Cloud, Mumbai)
 
-Some Indian government sites refuse foreign IP addresses. If Admin › Errors shows many `SOURCE_FAILING … BLOCKED`,
-run the nightly job from India instead: repo → Settings → Actions → Runners → *New self-hosted runner* (any always-on
-PC or Raspberry Pi at home), then change `runs-on: ubuntu-latest` to `runs-on: self-hosted` in
-`.github/workflows/nightly.yml` (crawl job only).
+Indian government sites block foreign servers, so the nightly **crawl** runs on our own free server in India
+(GitHub Actions "self-hosted runner"). The publish and Android jobs still run on GitHub.
+
+1. Oracle Cloud account (home region **India West (Mumbai)**; cannot be changed later).
+2. GitHub repo → Settings → Actions → Runners → **New self-hosted runner** → Linux → ARM64 → copy the value after `--token`.
+3. Oracle → Compute → Instances → **Create instance**: Ubuntu 24.04, shape **VM.Standard.A1.Flex, 1 OCPU, 6 GB**
+   (Always Free). *Show advanced options → Management → Initialization script → Paste* the whole of
+   `server/oracle-runner-setup.sh` with `PASTE_TOKEN_HERE` replaced by the token. Create.
+4. After ~10 minutes the runner shows as **Idle** on the GitHub Runners page.
+
+If the server is ever stopped, the nightly job waits for it and Admin › Health turns red after 30 hours.
+To crawl from GitHub's servers temporarily, run the nightly workflow with "on_github" ticked.
+Free accounts' idle servers can be reclaimed by Oracle; upgrading the account to Pay As You Go avoids that
+(Always Free resources stay free).
 
 ## Adding or removing a source
 
