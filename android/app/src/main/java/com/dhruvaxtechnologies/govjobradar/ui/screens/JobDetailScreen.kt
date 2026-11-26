@@ -1,6 +1,7 @@
 package com.dhruvaxtechnologies.govjobradar.ui.screens
 
 import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -98,7 +99,11 @@ fun JobDetailScreen(nav: NavHostController, id: String) {
             return@Scaffold
         }
         Column(Modifier.padding(pad).verticalScroll(rememberScrollState())) {
-            Column(Modifier.padding(16.dp)) {
+            val sec = Catalog.sector(job.sector)
+            Column(Modifier.fillMaxWidth().background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(sec.tint.copy(alpha = 0.16f), Color.Transparent)))
+                .padding(16.dp)) {
+                Icon(sec.icon, null, tint = sec.tint, modifier = Modifier.padding(bottom = 6.dp))
                 Text(job.title, style = MaterialTheme.typography.titleLarge)
                 Text(job.organisation + (job.state?.let { " · $it" } ?: ""), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 job.advtNo?.let { Text("Advt. No. $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -110,7 +115,7 @@ fun JobDetailScreen(nav: NavHostController, id: String) {
                     if (job.isNew()) Badge("NEW", MaterialTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.height(8.dp))
-                Text(deadlineText(job), color = deadlineColor(job.daysLeft()), fontWeight = FontWeight.Bold)
+                com.dhruvaxtechnologies.govjobradar.ui.DeadlinePill(job)
                 if (job.lastDate != null) job.lastDateNote?.let {
                     Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -250,7 +255,8 @@ private fun EligibilityCard(job: Job, p: com.dhruvaxtechnologies.govjobradar.dat
 @Composable
 private fun DetailCard(title: String, content: @Composable () -> Unit) {
     Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(1.dp)) {
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(2.dp)) {
         Column(Modifier.padding(14.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(6.dp))

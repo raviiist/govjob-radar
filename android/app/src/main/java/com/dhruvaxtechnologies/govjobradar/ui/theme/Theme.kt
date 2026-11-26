@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 val Teal = Color(0xFF0B5563)
@@ -21,7 +22,7 @@ val Warn = Color(0xFFEF6C00)
 private val Light = lightColorScheme(
     primary = Teal, onPrimary = Color.White, primaryContainer = Color(0xFFCDEBEF), onPrimaryContainer = Color(0xFF00363D),
     secondary = Amber, onSecondary = Color(0xFF2A1800), secondaryContainer = Color(0xFFFFE3B8),
-    onSecondaryContainer = Color(0xFF2A1800), background = Color(0xFFF6F8F9), surface = Color.White,
+    onSecondaryContainer = Color(0xFF2A1800), background = Color(0xFFF2F6F7), surface = Color.White,
     surfaceVariant = Color(0xFFE6ECEE), onSurfaceVariant = Color(0xFF46555C), outline = Color(0xFFB5C2C7),
 )
 private val Dark = darkColorScheme(
@@ -38,7 +39,13 @@ private val Type = Typography(
     labelSmall = TextStyle(fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 14.sp),
 )
 
+private val AppShapes = androidx.compose.material3.Shapes(
+    small = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+    medium = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+    large = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+)
+
 @Composable
 fun GovJobTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) Dark else Light, typography = Type, content = content)
+    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) Dark else Light, typography = Type, shapes = AppShapes, content = content)
 }

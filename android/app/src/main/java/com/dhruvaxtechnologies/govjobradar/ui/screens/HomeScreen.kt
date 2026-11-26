@@ -58,6 +58,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -199,24 +204,54 @@ private fun StatCard(label: String, value: Int, modifier: Modifier, onClick: () 
 
 @Composable
 private fun SectorGrid(sectors: List<Pair<Sector, Int>>, onClick: (Sector) -> Unit) {
-    Column(Modifier.padding(horizontal = 8.dp)) {
+    Column(Modifier.padding(horizontal = 10.dp)) {
         sectors.chunked(2).forEach { row ->
             Row {
                 row.forEach { (s, n) ->
-                    Card(onClick = { onClick(s) }, modifier = Modifier.weight(1f).padding(4.dp).alpha(if (n == 0) 0.55f else 1f),
+                    Card(onClick = { onClick(s) }, modifier = Modifier.weight(1f).padding(5.dp).alpha(if (n == 0) 0.5f else 1f),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(1.dp)) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(s.icon, null, tint = s.tint, modifier = Modifier.size(28.dp))
-                            Column(Modifier.padding(start = 10.dp)) {
-                                Text(s.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                                Text(if (n == 1) "1 opening" else "$n openings", style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        elevation = CardDefaults.cardElevation(2.dp)) {
+                        Column(Modifier.padding(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(40.dp).clip(CircleShape).background(s.tint.copy(alpha = 0.14f)),
+                                    contentAlignment = Alignment.Center) {
+                                    Icon(s.icon, null, tint = s.tint, modifier = Modifier.size(22.dp))
+                                }
+                                Spacer(Modifier.weight(1f))
+                                Text("$n", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+                                    color = if (n > 0) s.tint else MaterialTheme.colorScheme.outline)
                             }
+                            Spacer(Modifier.height(10.dp))
+                            Text(s.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold,
+                                maxLines = 2, minLines = 2)
                         }
                     }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/** Colourful header at the top of a tab with the key counts. */
+@Composable
+private fun Hero(title: String, subtitle: String, stats: List<Triple<String, Int, () -> Unit>>) {
+    val cs = MaterialTheme.colorScheme
+    Box(Modifier.fillMaxWidth().padding(14.dp).clip(RoundedCornerShape(22.dp))
+        .background(Brush.linearGradient(listOf(cs.primary, Color(0xFF13808F), Color(0xFF2A9D8F))))) {
+        Column(Modifier.padding(18.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
+            Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                stats.forEach { (label, value, onClick) ->
+                    Column(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.16f))
+                        .clickable(onClick = onClick).padding(10.dp)) {
+                        Text("$value", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.9f), maxLines = 1)
+                    }
+                }
             }
         }
     }
@@ -227,17 +262,11 @@ private fun CentralTab(nav: NavHostController, all: List<Job>, profile: com.dhru
     val jobs = Filters.select(all, "central", null, null, null)
     LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
         item {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatCard("Open now", jobs.count { !it.awaitingExtension }, Modifier.weight(1f)) {
-                    nav.navigate(listRoute("Central government jobs", level = "central"))
-                }
-                StatCard("Closing in 7 days", Filters.apply(jobs, "closing", profile).size, Modifier.weight(1f)) {
-                    nav.navigate(listRoute("Closing soon", level = "central", filter = "closing"))
-                }
-                StatCard("New", Filters.apply(jobs, "new", profile).size, Modifier.weight(1f)) {
-                    nav.navigate(listRoute("New this week", level = "central", filter = "new"))
-                }
-            }
+            Hero("Central Government", "Ministries, defence, railways, research, banks and PSUs", listOf(
+                Triple("Open now", jobs.count { !it.awaitingExtension }) { nav.navigate(listRoute("Central government jobs", level = "central")) },
+                Triple("Closing in 7 days", Filters.apply(jobs, "closing", profile).size) { nav.navigate(listRoute("Closing soon", level = "central", filter = "closing")) },
+                Triple("New", Filters.apply(jobs, "new", profile).size) { nav.navigate(listRoute("New this week", level = "central", filter = "new")) },
+            ))
         }
         item {
             LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -267,6 +296,13 @@ private fun StateTab(nav: NavHostController, all: List<Job>, homeState: String?)
     var menuOpen by remember { mutableStateOf(false) }
     val mine = stateJobs.filter { it.state == state }
     LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
+        item {
+            Hero(state, "State government vacancies", listOf(
+                Triple("Open now", mine.count { !it.awaitingExtension }) { nav.navigate(listRoute("$state – all jobs", level = "state", state = state)) },
+                Triple("Closing in 7 days", mine.count { (it.daysLeft() ?: 99) in 0..7 }) { nav.navigate(listRoute("$state – closing soon", level = "state", state = state, filter = "closing")) },
+                Triple("New", mine.count { it.isNew() }) { nav.navigate(listRoute("$state – new", level = "state", state = state, filter = "new")) },
+            ))
+        }
         item {
             Box(Modifier.padding(12.dp)) {
                 OutlinedButton(onClick = { menuOpen = true }, modifier = Modifier.fillMaxWidth()) {
@@ -318,6 +354,13 @@ private fun DeputationTab(nav: NavHostController, all: List<Job>, app: GovJobApp
         }
     })
     LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
+        item {
+            Hero("Deputation", "For serving government employees — apply through proper channel", listOf(
+                Triple("Central", Filters.select(all, "central", null, null, "deputation").size) { level = "central" },
+                Triple("State", Filters.select(all, "state", null, null, "deputation").size) { level = "state" },
+                Triple("Near my level", dep.count { Eligibility.payLevelOk(it, profile) == true }) { band = "mine" },
+            ))
+        }
         item {
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(12.dp)) {
                 listOf("central" to "Central", "state" to "State").forEachIndexed { i, (id, label) ->

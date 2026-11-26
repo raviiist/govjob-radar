@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -95,42 +96,52 @@ fun JobCard(job: Job, profile: Profile, saved: Boolean, onSave: () -> Unit, onCl
     val sector = Catalog.sector(job.sector)
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(1.dp),
+        elevation = CardDefaults.cardElevation(2.dp),
     ) {
-        Row(Modifier.height(IntrinsicSize.Min)) {
-            Box(Modifier.width(5.dp).fillMaxHeight().background(sector.tint))
-            Column(Modifier.padding(12.dp).weight(1f)) {
-                Row(verticalAlignment = Alignment.Top) {
-                    Column(Modifier.weight(1f)) {
-                        Text(job.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text(job.organisation + (job.state?.let { " · $it" } ?: ""), style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    IconButton(onClick = onSave, modifier = Modifier.size(36.dp)) {
-                        Icon(if (saved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                            contentDescription = if (saved) "Saved" else "Save", tint = MaterialTheme.colorScheme.primary)
-                    }
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(sector.tint.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center) {
+                    Icon(sector.icon, null, tint = sector.tint, modifier = Modifier.size(24.dp))
                 }
-                Spacer(Modifier.height(6.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (job.isNew()) Badge("NEW", MaterialTheme.colorScheme.primary)
-                    if (job.extended) Badge("DATE EXTENDED", Warn)
-                    if (job.awaitingExtension) Badge("CHECKING EXTENSION", MaterialTheme.colorScheme.outline)
-                    if (job.isDeputation) Badge("DEPUTATION", Color(0xFF6A1B9A))
-                    when (Eligibility.likelyEligible(job, profile)) {
-                        true -> Badge("LIKELY ELIGIBLE", Ok)
-                        else -> {}
-                    }
-                    job.totalVacancies?.let { SoftChip("$it posts") }
-                    job.payLevelMin?.let { lo -> SoftChip(if (job.payLevelMax != null && job.payLevelMax != lo) "Level $lo–${job.payLevelMax}" else "Level $lo") }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(job.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(job.organisation + (job.state?.let { " · $it" } ?: ""), style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(deadlineText(job), color = deadlineColor(job.daysLeft()), style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold)
+                IconButton(onClick = onSave, modifier = Modifier.size(36.dp)) {
+                    Icon(if (saved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                        contentDescription = if (saved) "Saved" else "Save", tint = MaterialTheme.colorScheme.primary)
+                }
             }
+            Spacer(Modifier.height(10.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (job.isNew()) Badge("NEW", MaterialTheme.colorScheme.primary)
+                if (job.extended) Badge("DATE EXTENDED", Warn)
+                if (job.awaitingExtension) Badge("CHECKING EXTENSION", MaterialTheme.colorScheme.outline)
+                if (job.isDeputation) Badge("DEPUTATION", Color(0xFF6A1B9A))
+                if (Eligibility.likelyEligible(job, profile) == true) Badge("LIKELY ELIGIBLE", Ok)
+                job.totalVacancies?.let { SoftChip("$it posts") }
+                job.payLevelMin?.let { lo -> SoftChip(if (job.payLevelMax != null && job.payLevelMax != lo) "Level $lo–${job.payLevelMax}" else "Level $lo") }
+            }
+            Spacer(Modifier.height(10.dp))
+            DeadlinePill(job)
         }
+    }
+}
+
+@Composable
+fun DeadlinePill(job: Job) {
+    val c = deadlineColor(job.daysLeft())
+    Row(Modifier.clip(RoundedCornerShape(50)).background(c.copy(alpha = 0.12f)).padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Outlined.Event, null, Modifier.size(14.dp), tint = c)
+        Spacer(Modifier.width(6.dp))
+        Text(deadlineText(job), color = c, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
     }
 }
 
