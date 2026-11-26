@@ -88,7 +88,7 @@ class Nightly:
         sources = [s for s in self.cfg["sources"] if not only or s["id"] in only]
         self.stats.sources_total = len(sources)
         print(f"AI: key {'set (' + str(len(self.ai.key)) + ' chars)' if self.ai and self.ai.key else 'MISSING'}, "
-              f"model {self.ai.model if self.ai else '-'}", flush=True)
+              f"models {getattr(self.ai, 'models', '-') if self.ai else '-'}", flush=True)
         if self.ai is None or not self.ai.key:
             self.flag("AI_KEY_MISSING", "GEMINI_API_KEY is not set, new notices cannot be read.",
                       severity="critical", hint="Add the GEMINI_API_KEY secret in the GitHub repository settings.")
@@ -122,7 +122,8 @@ class Nightly:
         self.store.set_status("server", {
             "state": "ok", "last_run_finished": iso(finished), "last_success": iso(finished),
             "duration_min": round((finished - started).total_seconds() / 60, 1),
-            "model": self.ai.model if self.ai else None, "ai_calls": self.ai.calls if self.ai else 0,
+            "model": ", ".join(getattr(self.ai, "models", [self.ai.model])) if self.ai else None, "ai_calls": self.ai.calls if self.ai else 0,
+            "ai_calls_by_model": dict(getattr(self.ai, "calls_by_model", {})) if self.ai else {},
             "ai_stopped": self.ai_stopped_reason,
             "stats": {k: v for k, v in s.__dict__.items() if k != "errors"},
             "fetch": dict(self.fetch.stats),
@@ -177,12 +178,7 @@ class Nightly:
                     if c:
                         used_url, cands, rediscovered = l.url, c, True
                         break
-                if not cands and options and self._ai_ok():
-                    pick = self._ai_call(self.ai.pick_listing, src, options)
-                    if pick and pick not in seen_urls:
-                        f, _, c = self._try_listing(pick)
-                        if c:
-                            used_url, cands, rediscovered = pick, c, True
+                # (The AI is not used here: its free daily allowance is kept for reading notices.)
 
         if not cands:
             fails = int(st.get("fail_count", 0)) + 1
@@ -266,6 +262,11 @@ class Nightly:
         if err:
             return False   # try again tomorrow
         if not text and scanned_pdf is None:
+            return True
+        # Save AI calls: a notice whose every date is already in the past has expired.
+        ds = [d for d in dates_in((text or "")[:20000]) if d.year >= 2000]
+        if text and ds and max(ds) < self.today:
+            self.stats.dropped += 1
             return True
         self.stats.notices_read += 1
         data = self._ai_call(self.ai.extract_notice, text=text or None, pdf_bytes=scanned_pdf, source=src,

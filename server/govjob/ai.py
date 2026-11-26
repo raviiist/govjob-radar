@@ -14,7 +14,9 @@ import time
 import requests
 
 API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-DEFAULT_MODEL = "gemini-flash-latest"
+DEFAULT_MODEL = "gemini-flash-lite-latest"
+# Tried in order; each model has its own free daily allowance.
+FALLBACK_MODELS = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-2.5-flash-lite"]
 
 SECTORS = ["defence", "police", "space_research", "railways", "banking", "civil_services", "ssc",
            "psu", "teaching", "health", "postal", "judiciary", "engineering", "other"]
@@ -89,60 +91,100 @@ notices{dep}? Return ONLY JSON: {{"url": "<one of the urls below or null>", "why
 
 
 class Gemini:
+    """Uses the first model in the list; when it is busy (503) or its free daily limit is used up
+    (429), moves on to the next model, which has its own free allowance."""
+
     def __init__(self, api_key: str | None = None, model: str | None = None, max_calls: int = 300,
                  min_interval: float = 6.5):
         self.key = api_key or os.environ.get("GEMINI_API_KEY", "")
-        self.model = model or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL
+        names = model or os.environ.get("GEMINI_MODEL") or ",".join(FALLBACK_MODELS)
+        self.models = [m.strip() for m in names.split(",") if m.strip()]
+        self.idx = 0
         self.max_calls = max_calls
         self.min_interval = min_interval   # stay under free-tier requests-per-minute
         self.calls = 0
+        self.calls_by_model: dict[str, int] = {}
         self._last = 0.0
         self.exhausted = False
 
     @property
+    def model(self) -> str:
+        return self.models[min(self.idx, len(self.models) - 1)]
+
+    @property
     def available(self) -> bool:
         return bool(self.key) and not self.exhausted and self.calls < self.max_calls
+
+    def _next_model(self) -> bool:
+        if self.idx + 1 < len(self.models):
+            self.idx += 1
+            return True
+        return False
+
+    @staticmethod
+    def _err(r) -> str:
+        try:
+            e = r.json().get("error", {})
+            return f"{e.get('status', '')}: {e.get('message', '')}".replace("\n", " ")[:300]
+        except ValueError:
+            return r.text.replace("\n", " ")[:300]
 
     def _call(self, parts: list[dict]) -> dict:
         if not self.key:
             raise KeyInvalid("GEMINI_API_KEY is not set")
         if self.exhausted or self.calls >= self.max_calls:
             raise QuotaExhausted("nightly AI call budget used up")
-        wait = self.min_interval - (time.time() - self._last)
-        if wait > 0:
-            time.sleep(wait)
         body = {"contents": [{"role": "user", "parts": parts}],
                 "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json"}}
-        for attempt in range(3):
+        busy = 0
+        missing = []
+        for _ in range(3 * len(self.models) + 2):
+            wait = self.min_interval - (time.time() - self._last)
+            if wait > 0:
+                time.sleep(wait)
             self._last = time.time()
             self.calls += 1
+            self.calls_by_model[self.model] = self.calls_by_model.get(self.model, 0) + 1
             try:
                 r = requests.post(API.format(model=self.model), params={"key": self.key},
-                                  json=body, timeout=120)
+                                  json=body, timeout=90)
             except requests.RequestException as e:
-                if attempt == 2:
-                    raise AIError(f"Gemini request failed: {e}")
-                time.sleep(10)
+                busy += 1
+                if busy >= 2 and not self._next_model():
+                    raise AIError(f"Gemini request failed: {type(e).__name__}")
                 continue
             if r.status_code == 200:
                 return self._parse(r.json())
-            msg = r.text[:400]
+            msg = self._err(r)
             if r.status_code == 404:
-                raise ModelMissing(f"model '{self.model}' not found — set the GEMINI_MODEL repository "
-                                   f"variable to a current Flash model name. {msg}")
+                missing.append(self.model)
+                if self._next_model():
+                    continue
+                raise ModelMissing(f"model(s) {missing} not found — set the GEMINI_MODEL repository variable "
+                                   f"to current model names (comma-separated). {msg}")
             if r.status_code in (400, 401, 403) and ("API key" in msg or "API_KEY" in msg or "PERMISSION" in msg):
                 raise KeyInvalid(f"Gemini rejected the API key: {msg}")
             if r.status_code == 429:
-                if "PerDay" in msg or "per day" in msg.lower() or attempt == 2:
+                if "PerDay" in msg or "per day" in msg.lower() or "PerDay" in r.text:
+                    if self._next_model():
+                        busy = 0
+                        continue
                     self.exhausted = True
-                    raise QuotaExhausted(f"free-tier limit reached: {msg}")
-                time.sleep(45)
+                    raise QuotaExhausted(f"free daily limit reached on all models {self.models}: {msg}")
+                time.sleep(40)   # per-minute limit: wait and retry same model
                 continue
-            if r.status_code >= 500 and attempt < 2:
-                time.sleep(15)
+            if r.status_code >= 500:
+                busy += 1
+                if busy >= 2:
+                    busy = 0
+                    if not self._next_model():
+                        self.idx = 0       # all busy: start again from the first after a pause
+                        time.sleep(30)
+                else:
+                    time.sleep(10)
                 continue
             raise AIError(f"Gemini HTTP {r.status_code}: {msg}")
-        raise AIError("Gemini: no response after retries")
+        raise AIError(f"Gemini busy on all models {self.models}, gave up on this notice")
 
     @staticmethod
     def _parse(resp: dict) -> dict:
