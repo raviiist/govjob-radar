@@ -16,7 +16,7 @@ import requests
 API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 DEFAULT_MODEL = "gemini-flash-lite-latest"
 # Tried in order; each model has its own free daily allowance.
-FALLBACK_MODELS = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-2.5-flash-lite"]
+FALLBACK_MODELS = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-3.5-flash"]
 
 SECTORS = ["defence", "police", "space_research", "railways", "banking", "civil_services", "ssc",
            "psu", "teaching", "health", "postal", "judiciary", "engineering", "other"]
@@ -175,6 +175,10 @@ class Gemini:
                 missing.append(self.model)
                 if self._next_model():
                     continue
+                if len(missing) < len(self.models):
+                    # Earlier models worked but are used up for today; the spare ones don't exist.
+                    self.exhausted = True
+                    raise QuotaExhausted(f"daily limit reached; fallback model(s) {missing} no longer exist ({msg})")
                 raise ModelMissing(f"model(s) {missing} not found — set the GEMINI_MODEL repository variable "
                                    f"to current model names (comma-separated). {msg}")
             if r.status_code in (400, 401, 403) and ("API key" in msg or "API_KEY" in msg or "PERMISSION" in msg):

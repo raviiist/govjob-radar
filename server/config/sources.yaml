@@ -136,7 +136,7 @@ sources:
   - {id: appsc, name: "Andhra Pradesh PSC", level: state, state: "Andhra Pradesh", sector: civil_services, kind: mixed,
      home: "https://psc.ap.gov.in"}
   - {id: tgpsc, name: "Telangana PSC", level: state, state: "Telangana", sector: civil_services, kind: mixed,
-     home: "https://www.tspsc.gov.in"}
+     home: "https://www.tgpsc.gov.in"}
   - {id: mpsc, name: "Maharashtra PSC", level: state, state: "Maharashtra", sector: civil_services, kind: mixed,
      home: "https://mpsc.gov.in"}
   - {id: gpsc, name: "Gujarat PSC", level: state, state: "Gujarat", sector: civil_services, kind: mixed,

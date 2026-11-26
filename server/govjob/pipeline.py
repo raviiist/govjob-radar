@@ -247,6 +247,10 @@ class Nightly:
 
         seen = self.store.get_seen(sid)
         new = [c for c in cands if c.key not in seen]
+        # Read the most important first when the free AI allowance is tight: deputation, extensions, newest.
+        new.sort(key=lambda l: (-bool(re.search(r"deputation|प्रतिनियुक्ति", f"{l.text} {l.context}", re.I))
+                                - bool(CORRIGENDUM_WORDS.search(l.text)),
+                                -max([d.toordinal() for d in dates_in(l.context)] or [0])))
         self.stats.notices_seen += len(new)
         limit = int(self.defaults.get("max_new_notices_per_source", 20))
         source_is_new = self._source_is_new(st)
