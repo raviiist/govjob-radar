@@ -91,11 +91,14 @@ fun SettingsScreen(nav: NavHostController) {
                     .padding(horizontal = 24.dp, vertical = 4.dp), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary)
             }
-            Text("Version ${BuildConfig.VERSION_NAME}", Modifier.padding(16.dp), style = MaterialTheme.typography.labelSmall)
+            var taps by remember { mutableStateOf(0) }
+            Text("Version ${BuildConfig.VERSION_NAME}", Modifier.fillMaxWidth().clickable { taps++ }.padding(16.dp),
+                style = MaterialTheme.typography.labelSmall)
             HorizontalDivider()
 
             // Small, unobtrusive: only the developer's Google account can actually open the Admin tab.
-            if (app.admin.isConfigured) {
+            // Developer-only: hidden until the version line is tapped 7 times (or already signed in).
+            if (app.admin.isConfigured && (taps >= 7 || adminEmail != null)) {
                 if (adminEmail != null && app.admin.isAdmin()) {
                     Row("Admin", "Signed in as $adminEmail") { nav.navigate("admin") }
                     Row("Admin sign out", "") { scope.launch { app.admin.signOut(); adminEmail = null } }
