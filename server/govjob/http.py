@@ -13,7 +13,7 @@ from .util import host
 
 UA = ("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) "
       "Chrome/126.0 Mobile Safari/537.36 GovJobRadarBot/1.0 (+https://github.com/raviiist/govjob-radar)")
-MAX_BYTES = 15 * 1024 * 1024
+MAX_BYTES = 30 * 1024 * 1024
 
 
 @dataclass
@@ -93,7 +93,7 @@ class Fetcher:
                             size += len(chunk)
                             if size > MAX_BYTES:
                                 r.close()
-                                out.error, out.error_code = "file larger than 15 MB", "TOO_LARGE"
+                                out.error, out.error_code = "file larger than 30 MB", "TOO_LARGE"
                                 return out
                             chunks.append(chunk)
                         out.content = b"".join(chunks)

@@ -154,6 +154,20 @@ private fun ReviewTab(items: List<ReviewItem>, act: (suspend () -> Unit) -> Unit
             Text("Approved items reach users at the next publish (within ~2 hours).", Modifier.padding(12.dp),
                 style = MaterialTheme.typography.labelSmall)
         }
+        val clean = items.filter { app.admin.onlyNewSource(it) }
+        if (clean.isNotEmpty()) item {
+            Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                colors = CardDefaults.cardColors(containerColor = Ok.copy(alpha = 0.10f))) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("${clean.size} item(s) passed every check", fontWeight = FontWeight.Bold)
+                    Text("They wait here only because their website is new this week. Open a few to spot-check, then approve them together.",
+                        style = MaterialTheme.typography.bodyMedium)
+                    Button(onClick = { act { app.admin.approveAll(clean) } }, modifier = Modifier.padding(top = 6.dp)) {
+                        Text("Approve all ${clean.size}")
+                    }
+                }
+            }
+        }
         items(items, key = { it.id }) {
             Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), elevation = CardDefaults.cardElevation(2.dp)) {
                 Column(Modifier.padding(12.dp)) {
@@ -319,7 +333,13 @@ private fun HealthTab(h: Health, act: (suspend () -> Unit) -> Unit, app: GovJobA
                 }
             }
         }
-        item { Text("Sources (${h.sources.size})", fontWeight = FontWeight.Bold) }
+        item {
+            val configured = (s["sources_configured"] as? Number)?.toInt()
+            val okCount = h.sources.count { ((it["fail_count"] as? Number)?.toInt() ?: 0) == 0 }
+            Text("Sources: $okCount working of ${configured ?: h.sources.size}" +
+                (if (configured != null && configured > h.sources.size) " (${configured - h.sources.size} not crawled yet)" else ""),
+                fontWeight = FontWeight.Bold)
+        }
         items(h.sources.sortedByDescending { (it["fail_count"] as? Number)?.toInt() ?: 0 }) { src ->
             val fails = (src["fail_count"] as? Number)?.toInt() ?: 0
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -365,7 +385,7 @@ private fun LiveTab(items: List<ReviewItem>, act: (suspend () -> Unit) -> Unit, 
         .sortedBy { it.lastDate ?: "9999" }
     LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
         item { OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth().padding(12.dp), label = { Text("Find a live job") }) }
-        item { Text("${shown.size} jobs. 'Take down' hides a job from users at the next publish and moves it to Review.",
+        item { Text("${shown.size} jobs. 'Remove' takes a job out for good at the next publish (use it for anything that is not a real vacancy).",
             Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.labelSmall) }
         items(shown, key = { it.id }) { j ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -374,7 +394,7 @@ private fun LiveTab(items: List<ReviewItem>, act: (suspend () -> Unit) -> Unit, 
                     Text("${j.sourceName} · ${fmtDate(j.lastDate)} · ${j.status}", style = MaterialTheme.typography.labelSmall)
                 }
                 TextButton(onClick = { openUrl(ctx, j.noticeUrl) }) { Text("Open") }
-                TextButton(onClick = { act { app.admin.unpublish(j) } }) { Text("Take down", color = Danger) }
+                TextButton(onClick = { act { app.admin.unpublish(j) } }) { Text("Remove", color = Danger) }
             }
         }
     }

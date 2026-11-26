@@ -33,7 +33,9 @@ class Bundle:
         return "\n\n".join(self.parts)
 
 
-SOURCE_FAIL_NIGHTS = 3          # flag a source after this many failed nights in a row
+SOURCE_FAIL_NIGHTS = 3
+BLOCKED_AFTER = 7               # nights of refusal before a site is only tried weekly
+REFUSING_CODES = ("BLOCKED", "TIMEOUT", "CONNECT", "TLS")          # flag a source after this many failed nights in a row
 EXTENSION_GRACE_NIGHTS = 3      # keep checking for an extension this many nights after the last date
 LINK_FAIL_NIGHTS = 2            # hide a job after its official link fails this many nights in a row
 REVIEW_STALE_DAYS = 3
@@ -102,7 +104,7 @@ class Nightly:
     def run(self, only: list[str] | None = None):
         started = now_utc()
         self.store.set_status("server", {"last_run_started": iso(started), "run_url": self.run_url,
-                                         "state": "running"})
+                                         "state": "running", "sources_configured": len(self.cfg["sources"])})
         self.store.load_jobs()
         sources = [s for s in self.cfg["sources"] if not only or s["id"] in only]
         self.stats.sources_total = len(sources)
@@ -161,6 +163,13 @@ class Nightly:
     def crawl_source(self, src: dict):
         sid = src["id"]
         st = self.store.get_source(sid)
+        # A site that has refused us for a week is tried only once a week (it is not going to change daily).
+        fails = int(st.get("fail_count", 0))
+        if fails >= BLOCKED_AFTER and st.get("last_error_code") in REFUSING_CODES and \
+                (self.today.toordinal() % 7) != (sum(map(ord, sid)) % 7):
+            self.stats.sources_failed += 1
+            print(f"source {sid}: skipped tonight (refuses our server; retried weekly)", flush=True)
+            return
         if not st.get("added_at"):
             st["added_at"] = iso(now_utc())
             self.store.set_source(sid, {"added_at": st["added_at"], "name": src["name"]})
@@ -223,7 +232,13 @@ class Nightly:
                                         "last_checked": iso(now_utc())})
             self.stats.sources_failed += 1
             print(f"source {sid}: FAILED ({code}) {reason[:200]}", flush=True)
-            if fails >= SOURCE_FAIL_NIGHTS:
+            if fails >= SOURCE_FAIL_NIGHTS and code in REFUSING_CODES:
+                self.flag("SOURCE_REFUSES", f"{src['name']}: the website refuses automated access ({reason}). "
+                          f"Its vacancies usually also appear in Employment News / DoPT / ministry circular pages, "
+                          f"which are crawled. It is retried once a week.", source_id=sid, severity="info",
+                          hint="Nothing to do. If you never want it retried, delete it from server/config/sources.yaml.")
+                self.store.resolve("SOURCE_FAILING", source_id=sid)
+            elif fails >= SOURCE_FAIL_NIGHTS:
                 hint = {
                     "BLOCKED": "The site refuses GitHub's servers (often blocks foreign IPs). Consider a "
                                "self-hosted runner in India (see SETUP.md) or remove the source.",
@@ -241,6 +256,7 @@ class Nightly:
                                     "last_checked": iso(now_utc()), "last_candidates": len(cands),
                                     "last_error": None, "tls_problem": bool(last_fetch and last_fetch.tls_fallback)})
         self.store.resolve("SOURCE_FAILING", source_id=sid)
+        self.store.resolve("SOURCE_REFUSES", source_id=sid)
         if rediscovered and st.get("listing_urls"):
             self.flag("SOURCE_MOVED", f"{src['name']}: found a new vacancies page on the site: {pages_ok}. "
                       f"Picked up automatically — no action needed.", source_id=sid, severity="info")

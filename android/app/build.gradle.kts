@@ -21,8 +21,8 @@ android {
         applicationId = "com.dhruvaxtechnologies.govjobradar"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
 
         buildConfigField("String", "FEED_BASE_URL", cfgStr("FEED_BASE_URL"))
         buildConfigField("String", "ADMIN_EMAIL", cfgStr("ADMIN_EMAIL"))

@@ -149,13 +149,28 @@ class AdminRepo(private val context: Context) {
         )).await()
     }
 
-    /** Hide a live job immediately from the next publish (e.g. a user reported wrong info). */
+    /** Remove a live job for good (not a vacancy, wrong info...). It does not come back to Review. */
     suspend fun unpublish(item: ReviewItem) {
         db().collection("jobs").document(item.id).update(mapOf(
-            "status" to "pending_review", "admin_updated_at" to now(),
-            "review_reasons" to listOf("Taken down by admin for checking"),
+            "status" to "rejected", "admin_updated_at" to now(), "reviewed_at" to now(),
+            "review_note" to "Taken down by admin",
         )).await()
     }
+
+    /** Items whose only open point is "new source, first week" — everything else checked out. */
+    fun onlyNewSource(item: ReviewItem): Boolean = item.status == "pending_review" && item.pendingExtensionTo == null &&
+        item.reasons.isNotEmpty() && item.reasons.all { it.startsWith("New source") }
+
+    suspend fun approveAll(items: List<ReviewItem>) {
+        items.chunked(400).forEach { chunk ->
+            val batch = db().batch()
+            chunk.forEach { batch.update(db().collection("jobs").document(it.id), mapOf(
+                "status" to "live", "reviewed_at" to now(), "admin_updated_at" to now(),
+                "review_reasons" to emptyList<String>())) }
+            batch.commit().await()
+        }
+    }
+
 
     @Suppress("UNCHECKED_CAST")
     suspend fun acceptExtension(item: ReviewItem) {
