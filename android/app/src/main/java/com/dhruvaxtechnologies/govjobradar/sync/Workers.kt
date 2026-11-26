@@ -16,6 +16,7 @@ import com.dhruvaxtechnologies.govjobradar.GovJobApp
 import com.dhruvaxtechnologies.govjobradar.data.Eligibility
 import com.dhruvaxtechnologies.govjobradar.data.Job
 import com.dhruvaxtechnologies.govjobradar.data.SyncResult
+import kotlinx.coroutines.flow.first
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -98,8 +99,8 @@ object Scheduler {
         return extendedSaved
     }
 
-    fun nightlyState(context: Context): WorkInfo.State? = runCatching {
-        WorkManager.getInstance(context).getWorkInfosForUniqueWork(NIGHTLY).get().firstOrNull()?.state
+    suspend fun nightlyState(context: Context): WorkInfo.State? = runCatching {
+        WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(NIGHTLY).first().firstOrNull()?.state
     }.getOrNull()
 }
 
