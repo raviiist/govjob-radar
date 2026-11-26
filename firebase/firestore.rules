@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // GovJob Radar — Firestore security rules.
-// Admin Gmail is set below. Paste the into Firebase console > Firestore Database > Rules > Publish.
+// Admin Gmail is set below. Paste this whole file into Firebase console > Firestore Database > Rules > Publish.
 //
 // - The nightly server uses a service account and is not limited by these rules.
 // - Phones sign in anonymously and may ONLY create small problem reports.
