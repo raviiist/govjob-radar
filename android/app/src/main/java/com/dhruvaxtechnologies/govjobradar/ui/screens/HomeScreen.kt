@@ -1,6 +1,7 @@
 package com.dhruvaxtechnologies.govjobradar.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,6 +99,21 @@ fun HomeScreen(nav: NavHostController, initialTab: String) {
         refreshing = false
     }
     LaunchedEffect(Unit) { if (feed.jobs.isEmpty()) refresh() }
+    var showDisclaimer by remember { mutableStateOf(!app.prefs.disclaimerAccepted) }
+    if (showDisclaimer) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { },
+            title = { Text("Please read") },
+            text = { Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                Text(com.dhruvaxtechnologies.govjobradar.ui.Disclaimer.FULL)
+            } },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { app.prefs.disclaimerAccepted = true; showDisclaimer = false }) {
+                    Text("I understand")
+                }
+            },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -221,7 +237,7 @@ private fun CentralTab(nav: NavHostController, all: List<Job>, profile: com.dhru
             SectorGrid(counts) { s -> nav.navigate(listRoute(s.label, level = "central", sector = s.id)) }
         }
         item {
-            InfoBanner("Not a government app. Every job links to its official notification — always read it before applying.",
+            InfoBanner(com.dhruvaxtechnologies.govjobradar.ui.Disclaimer.SHORT,
                 MaterialTheme.colorScheme.secondary)
         }
     }

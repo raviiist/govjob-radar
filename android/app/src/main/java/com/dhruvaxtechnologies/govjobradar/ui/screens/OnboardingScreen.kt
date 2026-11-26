@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
@@ -65,6 +66,7 @@ fun OnboardingScreen(editing: Boolean = false, onDone: () -> Unit) {
     var p by remember { mutableStateOf(app.prefs.profile.value) }
     var pickDob by remember { mutableStateOf(false) }
     var stateMenu by remember { mutableStateOf(false) }
+    var accepted by remember { mutableStateOf(false) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     Scaffold(topBar = {
@@ -132,14 +134,28 @@ fun OnboardingScreen(editing: Boolean = false, onDone: () -> Unit) {
             ToggleRow("Update on Wi-Fi only", p.wifiOnly) { p = p.copy(wifiOnly = it) }
 
             Spacer(Modifier.height(20.dp))
-            Button(onClick = {
+            if (!editing) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("Please read", fontWeight = FontWeight.Bold)
+                        Text(com.dhruvaxtechnologies.govjobradar.ui.Disclaimer.FULL, style = MaterialTheme.typography.bodyMedium)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(accepted, { accepted = it })
+                            Text("I understand and will check the official notification before applying")
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+            Button(enabled = editing || accepted, onClick = {
                 val wifiChanged = p.wifiOnly != app.prefs.profile.value.wifiOnly
                 app.prefs.saveProfile(p.copy(onboarded = true))
+                if (accepted) app.prefs.disclaimerAccepted = true
                 if (wifiChanged) Scheduler.scheduleNightly(app, p.wifiOnly)
                 if (!editing && Build.VERSION.SDK_INT >= 33) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
                 onDone()
             }, modifier = Modifier.fillMaxWidth()) { Text(if (editing) "Save" else "Start") }
-            if (!editing) TextButton(onClick = { app.prefs.saveProfile(p.copy(onboarded = true)); onDone() },
+            if (!editing) TextButton(enabled = accepted, onClick = { app.prefs.disclaimerAccepted = true; app.prefs.saveProfile(p.copy(onboarded = true)); onDone() },
                 modifier = Modifier.fillMaxWidth()) { Text("Skip for now") }
         }
     }

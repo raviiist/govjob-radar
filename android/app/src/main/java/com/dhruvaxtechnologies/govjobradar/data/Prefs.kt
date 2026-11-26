@@ -65,6 +65,10 @@ class Prefs(context: Context) {
         _saved.value = s
     }
 
+    var disclaimerAccepted: Boolean
+        get() = sp.getBoolean("disclaimer_v1", false)
+        set(v) = sp.edit().putBoolean("disclaimer_v1", v).apply()
+
     // --- sync bookkeeping ---
     var lastSyncOk: Long
         get() = sp.getLong("last_sync_ok", 0)

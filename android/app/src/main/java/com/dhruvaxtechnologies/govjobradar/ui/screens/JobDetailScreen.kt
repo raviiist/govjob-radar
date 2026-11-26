@@ -55,6 +55,7 @@ import com.dhruvaxtechnologies.govjobradar.data.Eligibility
 import com.dhruvaxtechnologies.govjobradar.data.Job
 import com.dhruvaxtechnologies.govjobradar.sync.Scheduler
 import com.dhruvaxtechnologies.govjobradar.ui.Badge
+import com.dhruvaxtechnologies.govjobradar.ui.Disclaimer
 import com.dhruvaxtechnologies.govjobradar.ui.EmptyState
 import com.dhruvaxtechnologies.govjobradar.ui.InfoBanner
 import com.dhruvaxtechnologies.govjobradar.ui.deadlineColor
@@ -172,8 +173,7 @@ fun JobDetailScreen(nav: NavHostController, id: String) {
                 Spacer(Modifier.height(10.dp))
                 Text("Source: ${job.sourceName} · official link checked ${fmtDate(job.verifiedAt)}",
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Summary prepared automatically from the official notification. The notification is final — " +
-                    "read it fully before applying. GovJob Radar is not a government app.",
+                Text("Summary prepared automatically from the official notification. " + Disclaimer.SHORT,
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = { reporting = true }) {
                     Icon(Icons.Outlined.Flag, null); Spacer(Modifier.width(6.dp)); Text("Report wrong information")

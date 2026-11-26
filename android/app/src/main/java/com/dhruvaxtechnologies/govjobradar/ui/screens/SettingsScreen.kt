@@ -34,6 +34,7 @@ import androidx.navigation.NavHostController
 import com.dhruvaxtechnologies.govjobradar.BuildConfig
 import com.dhruvaxtechnologies.govjobradar.GovJobApp
 import com.dhruvaxtechnologies.govjobradar.sync.Notifier
+import com.dhruvaxtechnologies.govjobradar.ui.Disclaimer
 import com.dhruvaxtechnologies.govjobradar.ui.SectionTitle
 import com.dhruvaxtechnologies.govjobradar.ui.openUrl
 import kotlinx.coroutines.launch
@@ -72,10 +73,8 @@ fun SettingsScreen(nav: NavHostController) {
             HorizontalDivider()
 
             SectionTitle("About")
-            Text("GovJob Radar is an independent app by DhruvaX Technologies. It is NOT a government app and is not affiliated " +
-                "with any government, ministry, department or recruiting body. Information is collected every night from the " +
-                "official websites listed below, and every job links to its official notification. Always read the official " +
-                "notification before applying.", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodyMedium)
+            Text("Disclaimer", Modifier.padding(horizontal = 16.dp), fontWeight = FontWeight.SemiBold)
+            Text(Disclaimer.FULL, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodyMedium)
             Row("Privacy policy", "$site/privacy.html") { openUrl(ctx, "$site/privacy.html") }
             Row("Official sources (${feed.sources.size})", "Websites checked every night") { }
             feed.sources.sortedBy { it.name }.forEach { s ->
