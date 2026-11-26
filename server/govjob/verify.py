@@ -5,7 +5,9 @@ Admin > Review with the exact reasons listed.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
+
+import re
 
 from .ai import QUALS, SECTORS
 from .util import date_mentioned, domain_allowed, iso, norm_advt, norm_for_match, norm_space, now_utc, \
@@ -57,6 +59,21 @@ def build_job(ai: dict, *, source: dict, notice_url: str, page_url: str, link_te
     state = ai.get("state") or source.get("state") if level == "state" else None
     title = norm_space(ai.get("title") or link_text)[:200]
     last_date = _date(ai.get("last_date"))
+    note = None
+    rule = ai.get("deadline_rule") if isinstance(ai.get("deadline_rule"), dict) else {}
+    days = _int(rule.get("days")) if rule else None
+    base = _date(rule.get("from_date")) if rule else None
+    if not last_date and days and base and rule.get("from") == "issue":
+        last_date = (date.fromisoformat(base) + timedelta(days=days)).isoformat()
+        note = f"Calculated: {days} days from the date of issue ({base}). Confirm in the notice."
+    elif not last_date and days:
+        where = "publication in Employment News" if rule.get("from") == "publication" else "the date in the notice"
+        note = f"{days} days from {where} — exact date not stated; see the notice."
+    original = _date(ai.get("original_last_date")) if ai.get("extended") else None
+    history = []
+    if original and last_date and original < last_date:
+        history = [{"from": original, "to": last_date, "notice_url": ai.get("extension_doc_url") or notice_url,
+                    "found_at": iso(now_utc())}]
     now = iso(now_utc())
     return {
         "id": job_id(source["id"], ai.get("advt_no"), notice_url, title),
@@ -74,8 +91,11 @@ def build_job(ai: dict, *, source: dict, notice_url: str, page_url: str, link_te
         "fee_text": norm_space(ai.get("fee_text"))[:300] or None,
         "apply_mode": ai.get("apply_mode") if ai.get("apply_mode") in ("online", "offline", "both") else None,
         "start_date": _date(ai.get("start_date")),
-        "last_date": last_date, "original_last_date": last_date,
-        "extended": False, "extension_history": [],
+        "last_date": last_date, "original_last_date": original or last_date, "last_date_note": note,
+        "deadline_rule": {"days": days, "from": rule.get("from"), "from_date": base,
+                          "text": norm_space(rule.get("text"))[:200]} if days else None,
+        "extended": bool(history), "extension_history": history,
+        "extension_doc": ai.get("extension_doc_url") if history else None,
         "notice_url": notice_url, "apply_url": ai.get("apply_url") or None, "page_url": page_url,
         "location": norm_space(ai.get("location"))[:160] or None,
         "how_to_apply": norm_space(ai.get("how_to_apply"))[:500] or None,
@@ -98,8 +118,23 @@ def check(job: dict, ai: dict, *, doc_text: str, scanned: bool, source: dict, su
         return "drop", ["notice is not on an official domain"]
 
     reasons = []
+    rule = job.get("deadline_rule") or {}
     if not job["last_date"]:
-        reasons.append("Last date not found in the notice")
+        if rule.get("days"):
+            reasons.append(f"Last date is '{rule.get('days')} days from {rule.get('from') or 'a date'}' and that date "
+                           "is not in the notice — enter the last date (Fix) or approve without one")
+        else:
+            reasons.append("Last date not found in the notice")
+    elif job.get("last_date_note") and rule.get("from_date"):
+        # Computed from "within N days of issue": both the rule and the issue date must be in the text.
+        ld = date.fromisoformat(job["last_date"])
+        if ld < today:
+            return "drop", ["last date already passed"]
+        if scanned:
+            reasons.append("Scanned PDF: calculated last date could not be cross-checked")
+        elif not (date_mentioned(doc_text, date.fromisoformat(rule["from_date"]))
+                  and re.search(rf"\b{rule['days']}\s*\(?\w*\)?\s*days", doc_text, re.I)):
+            reasons.append("Calculated last date: issue date or 'N days' wording not found in the document")
     else:
         ld = date.fromisoformat(job["last_date"])
         if ld < today:
@@ -147,3 +182,8 @@ def match_corrigendum(ai: dict, source_id: str, jobs: dict[str, dict]) -> tuple[
         if s > best_s:
             best, best_s = j, s
     return best, best_s
+
+
+def reasons_block_extension(reasons: list[str]) -> bool:
+    """Reasons that mean an extension date could be wrong (rather than just 'new source')."""
+    return any(k in r for r in reasons for k in ("verbatim", "does not match", "Scanned", "confidence", "not found"))

@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from govjob import publish  # noqa: E402
 from govjob.http import Fetched  # noqa: E402
-from govjob.pipeline import Nightly  # noqa: E402
+from govjob.pipeline import Bundle, Nightly  # noqa: E402
 from govjob.store import MemoryStore  # noqa: E402
 from govjob.util import parse_date  # noqa: E402
 
@@ -94,7 +94,15 @@ def new_store():
 
 def run(store, pg, ai, today=TODAY):
     n = Nightly(store, CFG, ai, fetcher=FakeFetcher(pg), today=today)
-    n._read_document = lambda url, src: (url, pg[url], None, "") if url in pg else (url, "", None, "404")
+    real = n._read_document
+
+    def read(url, src):
+        if url in pg and url.endswith(".pdf"):
+            return Bundle(notice_url=url, docs=[url], parts=[pg[url]])
+        if url in pg:
+            return real(url, src)
+        return Bundle(notice_url=url, error="404")
+    n._read_document = read
     return n.run()
 
 
@@ -214,3 +222,85 @@ def test_indian_dates():
     assert parse_date("15.12.2026") == date(2026, 12, 15)
     assert parse_date("05/01/2027") == date(2027, 1, 5)
     assert parse_date("31st December, 2026") == date(2026, 12, 31)
+
+
+# ---------------- deputation circular with "within 30 days of issue" + extension on the same page ----
+DOS_HOME = """<a href="/Careers.html">Careers</a>"""
+DOS_CAREERS = """<table><tr><td>Advt. No. A.26011/1/2025-I dated 15.10.2026: Filling up of Group-A and Group-B
+posts in DoS Secretariat on deputation basis</td><td><a href="/DOSRecruitment10.html">View</a></td></tr></table>"""
+DOS_PAGE_1 = """<h1>Application for the posts of Group-A and Group-B</h1><p>Advertisement Number: A.26011/1/2025-I</p>
+<a href="/pdf/Deputation_advertisement_15102026.pdf">Bilingual Advertisement</a>"""
+DOS_PAGE_2 = DOS_PAGE_1 + """<a href="/pdf/Extension_of_last_date_06112026.pdf">Extension: Circular</a>"""
+ADVT = ("Government of India, Department of Space. No. A.26011/1/2025-I dated 15.10.2026. Filling up of posts on "
+        "deputation basis. Applications should reach within 30 days from the date of issue of this circular. "
+        + "Eligibility details. " * 40)
+EXT = ("Department of Space. No. A.26011/1/2025-I (Vol.II) dated 06.11.2026. The last date for receipt of "
+       "applications is extended up to 30.11.2026. " + "Other terms unchanged. " * 30)
+DOS_SRC = {"id": "isro", "name": "ISRO", "level": "central", "sector": "space_research", "kind": "mixed",
+           "home": "https://www.isro.gov.in"}
+DOS_CFG = {"defaults": CFG["defaults"], "sources": [DOS_SRC]}
+
+AI_DEP = {"doc_type": "deputation", "title": "Group-A and Group-B posts in DoS Secretariat", "organisation": "Department of Space",
+          "advt_no": "A.26011/1/2025-I", "level": "central", "sector": "space_research",
+          "posts": [{"name": "Section Officer", "vacancies": 2, "pay_level": 8}], "last_date": None,
+          "issue_date": "2026-10-15",
+          "deadline_rule": {"days": 30, "from": "issue", "from_date": "2026-10-15", "text": "within 30 days from the date of issue"},
+          "evidence": {"last_date_text": None}, "confidence": 0.9}
+AI_DEP_EXT = dict(AI_DEP, last_date="2026-11-30", extended=True, original_last_date="2026-11-14",
+                  extension_doc_url="https://www.isro.gov.in/pdf/Extension_of_last_date_06112026.pdf",
+                  evidence={"last_date_text": "is extended up to 30.11.2026"})
+
+
+class BundleAI(FakeAI):
+    """Answers by what the bundle contains."""
+    def extract_notice(self, *, text, pdf_bytes, source, url, link_text):
+        self.calls += 1
+        return AI_DEP_EXT if "extended up to 30.11.2026" in text else AI_DEP
+
+
+def dos_pages(page):
+    return {"https://www.isro.gov.in": DOS_HOME, "https://www.isro.gov.in/Careers.html": DOS_CAREERS,
+            "https://www.isro.gov.in/DOSRecruitment10.html": page,
+            "https://www.isro.gov.in/pdf/Deputation_advertisement_15102026.pdf": ADVT,
+            "https://www.isro.gov.in/pdf/Extension_of_last_date_06112026.pdf": EXT}
+
+
+class PdfFetcher(FakeFetcher):
+    def get(self, url, head_only=False):
+        f = super().get(url, head_only)
+        if url.endswith(".pdf") and f.ok:
+            f.content = b"%PDF-" + f.content     # pretend; pdf_to_text is patched below
+        return f
+
+
+def run_dos(store, page, today, monkeypatch):
+    import govjob.pipeline as pl
+    monkeypatch.setattr(pl, "pdf_to_text", lambda b: b[5:].decode())
+    n = Nightly(store, DOS_CFG, BundleAI({}), fetcher=PdfFetcher(dos_pages(page)), today=today)
+    return n.run()
+
+
+def test_relative_deadline_is_calculated_and_published(monkeypatch):
+    st = new_store()
+    run_dos(st, DOS_PAGE_1, date(2026, 10, 20), monkeypatch)
+    j = next(iter(st.jobs.values()))
+    assert j["kind"] == "deputation" and j["last_date"] == "2026-11-14", j
+    assert "Calculated" in j["last_date_note"] and j["status"] == "live", j["review_reasons"]
+    assert j["detail_url"].endswith("DOSRecruitment10.html")
+
+
+def test_extension_on_same_page_is_found_later(monkeypatch):
+    st = new_store()
+    run_dos(st, DOS_PAGE_1, date(2026, 10, 20), monkeypatch)
+    run_dos(st, DOS_PAGE_2, date(2026, 11, 7), monkeypatch)      # extension PDF added to the page
+    j = next(iter(st.jobs.values()))
+    assert j["last_date"] == "2026-11-30" and j["extended"] and j["status"] == "live", j
+    assert j["extension_history"][-1]["from"] == "2026-11-14"
+
+
+def test_first_seen_after_extension_reads_both_documents(monkeypatch):
+    # Exactly the reported case: crawler first meets the notice when the extension already exists.
+    st = new_store()
+    run_dos(st, DOS_PAGE_2, date(2026, 11, 26), monkeypatch)
+    j = next(iter(st.jobs.values()))
+    assert j["last_date"] == "2026-11-30" and j["extended"] and j["status"] == "live", (j.get("review_reasons"), j)

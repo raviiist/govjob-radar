@@ -49,6 +49,8 @@ data class Job(
     @SerialName("start_date") val startDate: String? = null,
     @SerialName("last_date") val lastDate: String? = null,
     @SerialName("original_last_date") val originalLastDate: String? = null,
+    @SerialName("last_date_note") val lastDateNote: String? = null,
+    @SerialName("detail_url") val detailUrl: String? = null,
     val extended: Boolean = false,
     @SerialName("extension_history") val extensionHistory: List<Extension>? = null,
     @SerialName("notice_url") val noticeUrl: String = "",

@@ -25,6 +25,7 @@ defaults:
   # Domains every source may link to (official government suffixes)
   official_suffixes: [".gov.in", ".nic.in", ".ac.in", ".res.in", ".edu.in", ".mil.in", ".org.in"]
   max_new_notices_per_source: 20
+  max_listing_pages: 6
   max_age_days: 120
 
 sources:
@@ -42,7 +43,8 @@ sources:
 
   # ---------------- Space, research, atomic ----------------
   - {id: isro, name: "ISRO", level: central, sector: space_research, kind: mixed,
-     home: "https://www.isro.gov.in", hints: ["https://www.isro.gov.in/Careers.html"]}
+     home: "https://www.isro.gov.in", hints: ["https://www.isro.gov.in/Careers.html",
+     "https://www.isro.gov.in/CurrentOpportunities.html", "https://www.isro.gov.in/ViewAllOpportunities.html"]}
   - {id: dos, name: "Department of Space", level: central, sector: space_research, kind: deputation,
      home: "https://www.dos.gov.in"}
   - {id: drdo, name: "DRDO", level: central, sector: space_research, kind: mixed,
@@ -66,7 +68,7 @@ sources:
   - {id: cisf, name: "CISF", level: central, sector: police, kind: mixed, home: "https://cisf.gov.in"}
   - {id: itbp, name: "ITBP", level: central, sector: police, kind: mixed, home: "https://itbpolice.nic.in"}
   - {id: mha, name: "Ministry of Home Affairs", level: central, sector: police, kind: deputation,
-     home: "https://www.mha.gov.in"}
+     home: "https://www.mha.gov.in", hints: ["https://www.mha.gov.in/en/notifications/vacancies"]}
 
   # ---------------- Railways ----------------
   - {id: indianrail, name: "Indian Railways", level: central, sector: railways, kind: mixed,
@@ -95,6 +97,34 @@ sources:
      home: "https://kvsangathan.nic.in"}
   - {id: nvs, name: "Navodaya Vidyalaya Samiti", level: central, sector: teaching, kind: mixed,
      home: "https://navodaya.gov.in"}
+
+  # ---------------- Deputation circulars from many ministries (aggregator pages) ----------------
+  - {id: dae_vc, name: "DAE – vacancies in other Ministries", level: central, sector: other, kind: deputation,
+     home: "https://dae.gov.in", hints: ["https://dae.gov.in/vacancies-in-other-ministry"]}
+  - {id: mospi_dep, name: "MoSPI – deputation circulars", level: central, sector: other, kind: deputation,
+     home: "https://mospi.gov.in", hints: ["https://mospi.gov.in/deputation"]}
+  - {id: cag_dep, name: "CAG – deputation", level: central, sector: other, kind: deputation,
+     home: "https://cag.gov.in"}
+  - {id: dst, name: "Department of Science & Technology", level: central, sector: space_research, kind: mixed,
+     home: "https://dst.gov.in"}
+  - {id: dbt, name: "Department of Biotechnology", level: central, sector: space_research, kind: mixed,
+     home: "https://dbtindia.gov.in"}
+  - {id: mohfw, name: "Ministry of Health & Family Welfare", level: central, sector: health, kind: mixed,
+     home: "https://mohfw.gov.in"}
+  - {id: moe, name: "Ministry of Education", level: central, sector: teaching, kind: mixed,
+     home: "https://www.education.gov.in"}
+  - {id: morth, name: "Ministry of Road Transport & Highways", level: central, sector: engineering, kind: mixed,
+     home: "https://morth.nic.in"}
+  - {id: mohua, name: "Ministry of Housing & Urban Affairs", level: central, sector: engineering, kind: mixed,
+     home: "https://mohua.gov.in"}
+  - {id: dea, name: "Department of Economic Affairs", level: central, sector: banking, kind: deputation,
+     home: "https://dea.gov.in"}
+  - {id: cbic, name: "CBIC (Customs & GST)", level: central, sector: other, kind: mixed,
+     home: "https://www.cbic.gov.in"}
+  - {id: moes, name: "Ministry of Earth Sciences", level: central, sector: space_research, kind: mixed,
+     home: "https://moes.gov.in"}
+  - {id: dae, name: "Department of Atomic Energy", level: central, sector: space_research, kind: mixed,
+     home: "https://dae.gov.in"}
 
   # ---------------- State Public Service Commissions ----------------
   - {id: kpsc, name: "Karnataka PSC", level: state, state: "Karnataka", sector: civil_services, kind: mixed,

@@ -45,8 +45,19 @@ EXTRACT_PROMPT = """You read Indian government job notices. Return ONLY one JSON
 Source: {source_name} ({level}{state_part}). Default sector: {sector}. Notice link: {url}
 Link text on the source page: "{link_text}"
 
-Decide what this document is and extract facts EXACTLY as written. Never guess: use null when a
-value is not clearly stated. Dates as YYYY-MM-DD (Indian documents write day first).
+The input can contain SEVERAL documents about the same advertisement: the notice web page, the
+advertisement / vacancy circular, and later extension or corrigendum circulars. Treat them together as ONE
+vacancy: "last_date" must be the LATEST valid last date after any extension; if an extension circular moved
+the date, set "extended": true, "original_last_date" to the earlier date and "extension_doc_url" to the URL
+of the extension document. Only use doc_type "corrigendum" when the input is ONLY a change notice.
+
+Many deputation circulars give no calendar date but a rule such as "within 30 days from the date of issue
+of this circular" or "within 60 days from the date of publication in Employment News". Then fill
+"deadline_rule" (see below). Do NOT invent a calendar date for such a rule unless an extension document
+states an explicit new date.
+
+Extract facts EXACTLY as written. Never guess: use null when a value is not clearly stated.
+Dates as YYYY-MM-DD (Indian documents write day first).
 
 JSON keys:
 "doc_type": "recruitment" | "deputation" | "corrigendum" | "result" | "admit_card" | "other"
@@ -67,14 +78,18 @@ JSON keys:
 "fee_text": str|null
 "apply_mode": "online" | "offline" | "both" | null
 "start_date": "YYYY-MM-DD"|null
-"last_date": "YYYY-MM-DD"|null  (last date to apply / receive application)
+"last_date": "YYYY-MM-DD"|null  (latest last date to apply / receive application, after any extension)
+"issue_date": "YYYY-MM-DD"|null  (date of the advertisement / circular)
+"deadline_rule": {{"days": int, "from": "issue" | "publication" | "other", "from_date": "YYYY-MM-DD"|null, "text": verbatim phrase}} | null
+   - from "issue": from_date = the circular's issue date. from "publication": from_date only if the publication date is written.
+"extended": true|false, "original_last_date": "YYYY-MM-DD"|null, "extension_doc_url": str|null
 "apply_url": str|null  (only if written in the document)
 "location": str|null
 "how_to_apply": one or two short sentences|null
 "summary": two short plain-English sentences for a job seeker
 "deputation_tenure": str|null, "eligible_cadre": str|null  (deputation only)
 "corrigendum": {{"refers_to_advt_no": str|null, "refers_to_title": str|null, "new_last_date": "YYYY-MM-DD"|null, "old_last_date": "YYYY-MM-DD"|null, "what_changed": str|null}} | null
-"evidence": {{"last_date_text": verbatim text from the document that states the last date, or null,
+"evidence": {{"last_date_text": verbatim text that states the (latest) last date, or null,
               "advt_no_text": verbatim text containing the advertisement number, or null}}
 "confidence": number 0..1 — how sure you are that ALL the above facts are correct
 
@@ -205,18 +220,18 @@ class Gemini:
             data = data[0] if data else {}
         return data
 
-    def extract_notice(self, *, text: str | None, pdf_bytes: bytes | None, source: dict,
-                       url: str, link_text: str) -> dict:
+    def extract_notice(self, *, text: str | None, pdf_bytes, source: dict, url: str, link_text: str) -> dict:
         prompt = EXTRACT_PROMPT.format(
             source_name=source["name"], level=source["level"],
             state_part=f", {source['state']}" if source.get("state") else "",
             sector=source.get("sector", "other"), url=url, link_text=link_text[:200],
             sectors=SECTORS, quals=QUALS,
-            text=(text or "(the document is attached as a PDF)")[:30000])
+            text=(text or "(the document is attached as a PDF)")[:45000])
         parts = [{"text": prompt}]
-        if pdf_bytes and not text:
-            parts.append({"inline_data": {"mime_type": "application/pdf",
-                                          "data": base64.b64encode(pdf_bytes).decode()}})
+        if isinstance(pdf_bytes, (bytes, bytearray)):
+            pdf_bytes = [pdf_bytes]
+        for pdf in (pdf_bytes or [])[:2]:
+            parts.append({"inline_data": {"mime_type": "application/pdf", "data": base64.b64encode(pdf).decode()}})
         return self._call(parts)
 
     def pick_listing(self, source: dict, links: list) -> str | None:

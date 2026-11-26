@@ -23,7 +23,7 @@ SKIP_WORDS = re.compile(
 CORRIGENDUM_WORDS = re.compile(r"corrigendum|addendum|extension|extended|extend|revised|re-?open|शुद्धिपत्र",
                                re.IGNORECASE)
 LISTING_WORDS = re.compile(
-    r"recruit|career|vacanc|employment|jobs?\b|opportunit|advertisement|deputation|"
+    r"recruit|career|vacanc|employment|jobs?\b|opportunit|advertisement|deputation|circulars?\b|what.?s new|notices?\b|"
     r"भर्ती|रिक्ति", re.IGNORECASE)
 
 
@@ -35,7 +35,7 @@ class Link:
 
     @property
     def key(self) -> str:
-        return sha(self.url + "|" + norm_space(self.text).lower())
+        return sha("v2|" + self.url + "|" + norm_space(self.text).lower())   # v2: re-read everything once
 
 
 def soup_of(html: str) -> BeautifulSoup:

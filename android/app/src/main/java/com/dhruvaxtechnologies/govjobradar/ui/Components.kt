@@ -80,7 +80,7 @@ fun deadlineColor(days: Long?): Color = when {
 }
 
 fun deadlineText(job: Job): String {
-    val d = job.daysLeft() ?: return "Last date: see notice"
+    val d = job.daysLeft() ?: return job.lastDateNote?.let { "Last date: $it" } ?: "Last date: see notice"
     return when {
         job.awaitingExtension || d < 0 -> "Closed ${fmtDate(job.lastDate)}"
         d == 0L -> "Last date TODAY"

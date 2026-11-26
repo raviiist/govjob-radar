@@ -12,7 +12,26 @@ from .extract import (CORRIGENDUM_WORDS, Link, candidate_notices, html_to_text, 
                       links_of, listing_link_candidates, pdf_to_text, JOB_WORDS)
 from .http import Fetcher
 from .util import IST, date_mentioned, dates_in, domain_allowed, iso, now_utc, parse_date
-from .verify import build_job, check, match_corrigendum
+from .verify import build_job, check, match_corrigendum, reasons_block_extension
+
+RELATIVE_DEADLINE = re.compile(r"within\s+(\d+|thirty|forty[- ]five|sixty|fifteen|twenty[- ]one)\s+days|"
+                               r"(\d+|thirty|sixty)\s+days\s+(from|of|after)\s+the\s+date", re.I)
+NO_DATE_CLOSE_DAYS = 75         # a job with no last date at all is closed this long after we first saw it
+
+
+@dataclass
+class Bundle:
+    notice_url: str
+    detail_url: str | None = None
+    docs: list = field(default_factory=list)
+    parts: list = field(default_factory=list)
+    scanned: list = field(default_factory=list)
+    error: str = ""
+
+    @property
+    def text(self) -> str:
+        return "\n\n".join(self.parts)
+
 
 SOURCE_FAIL_NIGHTS = 3          # flag a source after this many failed nights in a row
 EXTENSION_GRACE_NIGHTS = 3      # keep checking for an extension this many nights after the last date
@@ -146,39 +165,54 @@ class Nightly:
             st["added_at"] = iso(now_utc())
             self.store.set_source(sid, {"added_at": st["added_at"], "name": src["name"]})
         order, seen_urls = [], set()
-        for u in [st.get("listing_url")] + list(src.get("hints", [])) + [src["home"]]:
+        for u in list(st.get("listing_urls") or [st.get("listing_url")]) + list(src.get("hints", [])) + [src["home"]]:
             if u and u not in seen_urls:
                 order.append(u)
                 seen_urls.add(u)
 
-        used_url, cands, home_fetch, last_fetch = None, [], None, None
-        for u in order:
-            f, links, c = self._try_listing(u)
+        # Collect notices from several pages: saved listing pages, hints, the home page, and pages the
+        # home page links to (careers / recruitment / vacancies / deputation / circulars ...).
+        cands, pages_ok, home_fetch, last_fetch, by_key = [], [], None, None, {}
+        max_pages = int(self.defaults.get("max_listing_pages", 6))
+
+        def take(url):
+            nonlocal last_fetch
+            f, links, c = self._try_listing(url)
             last_fetch = f
+            if c:
+                pages_ok.append(url)
+                for l in c:
+                    if l.key not in by_key:
+                        by_key[l.key] = (l, url)
+            return f, links
+
+        for u in order:
+            if len(pages_ok) >= max_pages:
+                break
+            f, links = take(u)
             if u == src["home"]:
                 home_fetch = (f, links)
-            if c:
-                used_url, cands = u, c
-                break
-
+        if home_fetch is None:
+            f, links = take(src["home"])
+            home_fetch = (f, links)
+        hf, hlinks = home_fetch
         rediscovered = False
-        if not cands:
-            if home_fetch is None:
-                f, links, _ = self._try_listing(src["home"])
-                home_fetch = (f, links)
-            hf, hlinks = home_fetch
-            if hf.ok:
-                options = [l for l in listing_link_candidates(hlinks)
-                           if domain_allowed(l.url, src["home"], src.get("domains", []), self.suffixes)]
-                for l in options[:6]:
-                    if l.url in seen_urls:
-                        continue
-                    seen_urls.add(l.url)
-                    f, _, c = self._try_listing(l.url)
-                    if c:
-                        used_url, cands, rediscovered = l.url, c, True
-                        break
-                # (The AI is not used here: its free daily allowance is kept for reading notices.)
+        if hf.ok:
+            options = [l for l in listing_link_candidates(hlinks)
+                       if domain_allowed(l.url, src["home"], src.get("domains", []), self.suffixes)]
+            for l in options[:8]:
+                if len(pages_ok) >= max_pages:
+                    break
+                if l.url in seen_urls:
+                    continue
+                seen_urls.add(l.url)
+                before = len(pages_ok)
+                take(l.url)
+                if len(pages_ok) > before and l.url not in (st.get("listing_urls") or []):
+                    rediscovered = True
+        cands = [v[0] for v in by_key.values()]
+        page_of = {k: v[1] for k, v in by_key.items()}
+        used_url = pages_ok[0] if pages_ok else None
 
         if not cands:
             fails = int(st.get("fail_count", 0)) + 1
@@ -202,14 +236,14 @@ class Nightly:
             return
 
         self.stats.sources_ok += 1
-        print(f"source {sid}: ok, {len(cands)} notices on {used_url}", flush=True)
-        self.store.set_source(sid, {"listing_url": used_url, "fail_count": 0, "last_ok": iso(now_utc()),
+        print(f"source {sid}: ok, {len(cands)} notices on {len(pages_ok)} page(s): {pages_ok}", flush=True)
+        self.store.set_source(sid, {"listing_url": used_url, "listing_urls": pages_ok, "fail_count": 0, "last_ok": iso(now_utc()),
                                     "last_checked": iso(now_utc()), "last_candidates": len(cands),
                                     "last_error": None, "tls_problem": bool(last_fetch and last_fetch.tls_fallback)})
         self.store.resolve("SOURCE_FAILING", source_id=sid)
-        if rediscovered and st.get("listing_url"):
-            self.flag("SOURCE_MOVED", f"{src['name']}: recruitment page moved from {st.get('listing_url')} to "
-                      f"{used_url}. Found automatically — no action needed.", source_id=sid, severity="info")
+        if rediscovered and st.get("listing_urls"):
+            self.flag("SOURCE_MOVED", f"{src['name']}: found a new vacancies page on the site: {pages_ok}. "
+                      f"Picked up automatically — no action needed.", source_id=sid, severity="info")
 
         seen = self.store.get_seen(sid)
         new = [c for c in cands if c.key not in seen]
@@ -220,7 +254,7 @@ class Nightly:
             if not self._ai_ok():
                 self.stats.deferred_for_quota += 1
                 continue
-            done = self.process_notice(src, link, used_url, source_is_new)
+            done = self.process_notice(src, link, page_of.get(link.key, used_url), source_is_new)
             if done:
                 seen.add(link.key)
         self.store.set_seen(sid, seen)
@@ -233,54 +267,90 @@ class Nightly:
         return (now_utc() - added).days < int(self.settings.get("new_source_days", 7))
 
     # ------------------------------------------------------------------ one notice
-    def _read_document(self, url: str, src: dict):
-        """Returns (notice_url, text, pdf_bytes_if_scanned, error)."""
+    def _read_document(self, url: str, src: dict) -> Bundle:
+        """Read a notice. If it is an HTML page, also read the PDFs on it (advertisement, extension,
+        corrigendum ...) so the AI sees the whole story, e.g. a later extension circular."""
+        b = Bundle(notice_url=url)
         f = self.fetch.get(url)
         if not f.ok:
-            return url, "", None, f.error or "could not open"
+            b.error = f.error or "could not open"
+            return b
         if f.is_pdf:
-            text = pdf_to_text(f.content)
-            if len(text) < 200:
-                return f.final_url or url, "", (f.content if len(f.content) < 8_000_000 else None), ""
-            return f.final_url or url, text, None, ""
+            b.notice_url = f.final_url or url
+            b.docs = [b.notice_url]
+            self._add_pdf(b, "Notice", b.notice_url, f.content)
+            return b
+        page_url = f.final_url or url
         html = f.text()
-        text = html_to_text(html)
-        if len(text) < 600:
-            # Page is only a wrapper around the real PDF notice: follow it.
-            for l in links_of(html, f.final_url or url):
-                if is_pdf_url(l.url) and JOB_WORDS.search(l.text + " " + l.context) and \
-                        domain_allowed(l.url, src["home"], src.get("domains", []), self.suffixes):
-                    return self._read_document(l.url, src)
-        return f.final_url or url, text, None, ""
+        page_text = html_to_text(html)
+        pdfs = []
+        for l in links_of(html, page_url):
+            if not is_pdf_url(l.url) or l.url in [p.url for p in pdfs]:
+                continue
+            if not domain_allowed(l.url, src["home"], src.get("domains", []), self.suffixes):
+                continue
+            pdfs.append(l)
+        # A detail page has few PDFs - read them all; on a busy page keep only vacancy-related ones.
+        if len(pdfs) > 4:
+            pdfs = [l for l in pdfs if JOB_WORDS.search(f"{l.text} {l.context} {l.url}")]
+        pdfs = pdfs[:4]
+        b.parts.append(f"=== Notice page: {page_url} ===\n{page_text[:4000]}")
+        b.detail_url = page_url if pdfs else None
+        b.docs = [p.url for p in pdfs]
+        main = next((p for p in pdfs if re.search(r"advert|advt|notification|vacancy circular|bilingual|recruitment",
+                                                   f"{p.text} {p.url}", re.I)
+                     and not CORRIGENDUM_WORDS.search(p.text)), pdfs[0] if pdfs else None)
+        b.notice_url = main.url if main else page_url
+        for p in pdfs:
+            pf = self.fetch.get(p.url)
+            if pf.ok:
+                self._add_pdf(b, p.text or "Document", p.url, pf.content)
+        return b
+
+    @staticmethod
+    def _add_pdf(b: "Bundle", label: str, url: str, content: bytes):
+        text = pdf_to_text(content)
+        if len(text) >= 200:
+            b.parts.append(f"=== {label[:80]} ({url}) ===\n{text[:14000]}")
+        elif len(content) < 8_000_000 and len(b.scanned) < 2:
+            b.scanned.append(content)
+            b.parts.append(f"=== {label[:80]} ({url}) === (scanned PDF attached)")
 
     def process_notice(self, src: dict, link: Link, page_url: str, source_is_new: bool) -> bool:
         """Returns True when the notice is finished with (do not read it again)."""
         if not domain_allowed(link.url, src["home"], src.get("domains", []), self.suffixes):
             self.stats.dropped += 1
             return True
-        notice_url, text, scanned_pdf, err = self._read_document(link.url, src)
-        if err:
+        b = self._read_document(link.url, src)
+        if b.error:
             return False   # try again tomorrow
-        if not text and scanned_pdf is None:
+        if not b.parts:
             return True
-        # Save AI calls: a notice whose every date is already in the past has expired.
-        ds = [d for d in dates_in((text or "")[:20000]) if d.year >= 2000]
-        if text and ds and max(ds) < self.today:
+        text = b.text
+        notice_url = b.notice_url
+        scanned_pdf = b.scanned or None
+        # Save AI calls: skip a notice whose every date is in the past - unless its deadline is relative
+        # ("within 30 days of issue") or it mentions an extension.
+        ds = [d for d in dates_in(text[:40000]) if d.year >= 2000]
+        if not b.scanned and ds and max(ds) < self.today and not RELATIVE_DEADLINE.search(text) \
+                and not CORRIGENDUM_WORDS.search(text):
             self.stats.dropped += 1
             return True
         self.stats.notices_read += 1
-        data = self._ai_call(self.ai.extract_notice, text=text or None, pdf_bytes=scanned_pdf, source=src,
+        data = self._ai_call(self.ai.extract_notice, text=text, pdf_bytes=b.scanned, source=src,
                              url=notice_url, link_text=link.text)
         if data is None:
             return False
         is_corr = data.get("doc_type") == "corrigendum" or (
             CORRIGENDUM_WORDS.search(link.text) and data.get("doc_type") not in ("recruitment", "deputation"))
         if is_corr:
-            self.apply_corrigendum(src, data, notice_url, text, scanned_pdf is not None, page_url, link)
+            self.apply_corrigendum(src, data, notice_url, text, bool(b.scanned), page_url, link)
             return True
 
         job = build_job(data, source=src, notice_url=notice_url, page_url=page_url, link_text=link.text)
-        decision, reasons = check(job, data, doc_text=text, scanned=scanned_pdf is not None, source=src,
+        job["detail_url"] = b.detail_url
+        job["docs"] = b.docs
+        decision, reasons = check(job, data, doc_text=text, scanned=bool(b.scanned), source=src,
                                   suffixes=self.suffixes, today=self.today, settings=self.settings,
                                   source_is_new=source_is_new)
         if decision == "drop":
@@ -288,10 +358,17 @@ class Nightly:
             return True
         existing = self.store.jobs.get(job["id"])
         if existing:
-            # Same advertisement listed again (e.g. on another page). Only a later date matters.
-            if job["last_date"] and existing.get("last_date") and job["last_date"] > existing["last_date"] \
-                    and decision == "publish":
-                self._extend(existing, job["last_date"], notice_url, "re-published notice shows a later date")
+            # Same advertisement listed again (e.g. "extension" entry linking to the same page).
+            if job["last_date"] and (not existing.get("last_date") or job["last_date"] > existing["last_date"]):
+                if decision == "publish" or (existing.get("last_date") and not reasons_block_extension(reasons)):
+                    self._extend(existing, job["last_date"], job.get("extension_doc") or notice_url,
+                                 "extension found on the notice page")
+                else:
+                    self._pending_extension(existing, job["last_date"], job.get("extension_doc") or notice_url,
+                                            1.0, False, "listed again with a later last date")
+            if b.detail_url and not existing.get("detail_url"):
+                existing.update({"detail_url": b.detail_url, "docs": b.docs})
+                self.store.put_job(existing)
             return True
         job["status"] = "live" if decision == "publish" else "pending_review"
         job["review_reasons"] = reasons
@@ -315,26 +392,31 @@ class Nightly:
         self.store.put_job(job)
         self.stats.extensions += 1
 
-    def apply_corrigendum(self, src, data, notice_url, text, scanned, page_url, link):
+    def _pending_extension(self, target: dict, new_date: str, notice_url: str, score: float, verified: bool,
+                           why: str):
+        target["pending_extension"] = {"to": new_date, "notice_url": notice_url,
+                                       "match_score": round(score, 2), "verified": verified}
+        rs = [r for r in (target.get("review_reasons") or []) if not r.startswith("Possible date extension")]
+        rs.append(f"Possible date extension to {new_date} ({why}, match {score:.0%}"
+                  f"{'' if verified else ', date not cross-checked'})")
+        target["review_reasons"] = rs
+        self.store.put_job(target)
+        self.stats.sent_to_review += 1
+
+    def apply_corrigendum(self, src, data, notice_url, text, scanned, page_url, link, target=None, score=None):
         c = data.get("corrigendum") or {}
         new_date = parse_date(c.get("new_last_date") or data.get("last_date"))
-        target, score = match_corrigendum(data, src["id"], self.store.jobs)
+        if target is None:
+            target, score = match_corrigendum(data, src["id"], self.store.jobs)
         if target and new_date:
             old = parse_date(target.get("last_date"))
             verified = (not scanned) and date_mentioned(text, new_date)
-            if old and new_date > old:
+            if not old or new_date > old:
                 if score >= 0.9 and verified and self.settings.get("auto_publish", True) \
                         and target.get("status") != "pending_review":
                     self._extend(target, new_date.isoformat(), notice_url, "corrigendum")
                 else:
-                    target["pending_extension"] = {"to": new_date.isoformat(), "notice_url": notice_url,
-                                                   "match_score": round(score, 2), "verified": verified}
-                    rs = list(target.get("review_reasons") or [])
-                    rs.append(f"Possible date extension to {new_date.isoformat()} (corrigendum, match "
-                              f"{score:.0%}{'' if verified else ', date not cross-checked'})")
-                    target["review_reasons"] = rs
-                    self.store.put_job(target)
-                    self.stats.sent_to_review += 1
+                    self._pending_extension(target, new_date.isoformat(), notice_url, score, verified, "corrigendum")
             return
         # Corrigendum for something we do not have: show it to the admin as a normal notice.
         if new_date and new_date >= self.today:
@@ -344,6 +426,38 @@ class Nightly:
                 job["review_reasons"] = ["Corrigendum for an advertisement not in our list — check before publishing"]
                 self.store.put_job(job)
                 self.stats.sent_to_review += 1
+
+    def _watch_detail_page(self, job: dict):
+        """Re-open a job's own notice page; if a new PDF (extension / corrigendum) appeared, read it."""
+        url = job.get("detail_url")
+        if not url or not self._ai_ok():
+            return
+        src = next((s for s in self.cfg["sources"] if s["id"] == job.get("source_id")), None)
+        if not src:
+            return
+        f = self.fetch.get(url)
+        if not f.ok or f.is_pdf:
+            return
+        pdfs = [l.url for l in links_of(f.text(), f.final_url or url) if is_pdf_url(l.url)
+                and domain_allowed(l.url, src["home"], src.get("domains", []), self.suffixes)]
+        known = set(job.get("docs") or [])
+        if not [u for u in pdfs if u not in known]:
+            return
+        b = self._read_document(url, src)
+        if b.error:
+            return
+        self.stats.notices_read += 1
+        data = self._ai_call(self.ai.extract_notice, text=b.text, pdf_bytes=b.scanned, source=src,
+                             url=b.notice_url, link_text=job.get("title", ""))
+        if data is None:
+            return
+        job["docs"] = b.docs
+        self.store.put_job(job)
+        new_date = data.get("last_date") or (data.get("corrigendum") or {}).get("new_last_date")
+        if new_date:
+            ext_doc = data.get("extension_doc_url") or next((u for u in b.docs if u not in known), b.notice_url)
+            self.apply_corrigendum(src, dict(data, last_date=new_date), ext_doc, b.text, bool(b.scanned),
+                                   job.get("page_url"), Link(url, job.get("title", ""), ""), target=job, score=1.0)
 
     def _apply_page_shows_later_date(self, job: dict) -> str | None:
         """Look at the apply page for a 'last date' later than ours (common silent extension)."""
@@ -369,7 +483,27 @@ class Nightly:
     def lifecycle(self):
         for job in list(self.store.jobs.values()):
             status = job.get("status")
+            # New extension / corrigendum PDFs on the job's own page (checked before expiry decisions).
+            if status in ("live", "awaiting_extension_check", "pending_review") and job.get("detail_url"):
+                try:
+                    self._watch_detail_page(job)
+                except Exception as e:
+                    self.flag("WATCH_FAILED", f"{job.get('title')}: {e}", job_id=job["id"],
+                              source_id=job.get("source_id"), severity="info")
+                status = job.get("status")
             ld = parse_date(job.get("last_date"))
+
+            # No last date at all (e.g. "30 days from publication"): close after a fixed time.
+            if not ld and status in ("live", "pending_review") and job.get("first_seen"):
+                try:
+                    age = (now_utc() - datetime.fromisoformat(job["first_seen"])).days
+                except ValueError:
+                    age = 0
+                if age > NO_DATE_CLOSE_DAYS:
+                    job["status"] = "closed"
+                    job["closed_at"] = iso(now_utc())
+                    self.store.put_job(job)
+                    continue
 
             # Expired items still waiting for review: no longer useful.
             if status == "pending_review" and ld and ld < self.today:

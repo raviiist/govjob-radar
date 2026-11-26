@@ -107,6 +107,9 @@ fun JobDetailScreen(nav: NavHostController, id: String) {
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(deadlineText(job), color = deadlineColor(job.daysLeft()), fontWeight = FontWeight.Bold)
+                if (job.lastDate != null) job.lastDateNote?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
 
             if (job.awaitingExtension) InfoBanner("The last date (${fmtDate(job.lastDate)}) has passed. We are checking the official " +
@@ -155,6 +158,11 @@ fun JobDetailScreen(nav: NavHostController, id: String) {
             Column(Modifier.padding(16.dp)) {
                 Button(onClick = { openUrl(ctx, job.noticeUrl) }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.PictureAsPdf, null); Spacer(Modifier.width(8.dp)); Text("Read official notification")
+                }
+                job.detailUrl?.takeIf { it != job.noticeUrl }?.let { url ->
+                    OutlinedButton(onClick = { openUrl(ctx, url) }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.AutoMirrored.Outlined.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text("Official notice page (all documents)")
+                    }
                 }
                 job.applyUrl?.let { url ->
                     OutlinedButton(onClick = { openUrl(ctx, url) }, modifier = Modifier.fillMaxWidth()) {

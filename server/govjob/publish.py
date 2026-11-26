@@ -13,7 +13,7 @@ PUBLIC_FIELDS = [
     "id", "title", "organisation", "advt_no", "source_id", "source_name", "level", "state", "sector", "kind",
     "posts", "total_vacancies", "pay_level_min", "pay_level_max", "min_qualification", "qualification_summary",
     "age_min", "age_max", "age_as_on", "age_note", "fee_text", "apply_mode", "start_date", "last_date",
-    "original_last_date", "extended", "extension_history", "notice_url", "apply_url", "page_url", "location",
+    "original_last_date", "last_date_note", "detail_url", "extended", "extension_history", "notice_url", "apply_url", "page_url", "location",
     "how_to_apply", "summary", "deputation_tenure", "eligible_cadre", "first_seen", "verified_at", "status",
     "closed_at",
 ]
