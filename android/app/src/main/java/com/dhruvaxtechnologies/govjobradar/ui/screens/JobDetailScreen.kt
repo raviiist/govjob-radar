@@ -58,6 +58,7 @@ import com.dhruvaxtechnologies.govjobradar.ui.Badge
 import com.dhruvaxtechnologies.govjobradar.ui.Disclaimer
 import com.dhruvaxtechnologies.govjobradar.ui.EmptyState
 import com.dhruvaxtechnologies.govjobradar.ui.InfoBanner
+import com.dhruvaxtechnologies.govjobradar.ui.LockedCard
 import com.dhruvaxtechnologies.govjobradar.ui.deadlineColor
 import com.dhruvaxtechnologies.govjobradar.ui.deadlineText
 import com.dhruvaxtechnologies.govjobradar.ui.fmtDate
@@ -77,13 +78,15 @@ fun JobDetailScreen(nav: NavHostController, id: String) {
     val saved by app.prefs.saved.collectAsState()
     val job = remember(feed, id) { app.repo.job(id) }
     var reporting by remember { mutableStateOf(false) }
+    val unlocked by app.billing.unlocked.collectAsState()
+    val full = unlocked || app.fullAccess()
 
     Scaffold(topBar = {
         TopAppBar(title = { Text(job?.let { Catalog.sector(it.sector).label } ?: "Job") },
             navigationIcon = { IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
             actions = {
                 if (job != null) {
-                    IconButton(onClick = { app.prefs.toggleSaved(job.id); Scheduler.syncReminders(app) }) {
+                    IconButton(onClick = { com.dhruvaxtechnologies.govjobradar.ui.toggleSaveGuarded(app, nav, job.id) }) {
                         Icon(if (job.id in saved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, "Save")
                     }
                     IconButton(onClick = { share(ctx, job) }) { Icon(Icons.Outlined.Share, "Share") }
@@ -123,38 +126,42 @@ fun JobDetailScreen(nav: NavHostController, id: String) {
             }
             if (job.status == "closed") InfoBanner("Closed on ${fmtDate(job.lastDate)}. Kept here for reference.", MaterialTheme.colorScheme.outline)
 
-            EligibilityCard(job, profile, onEdit = { nav.navigate("profile") })
+            if (!full) {
+                LockedCard(nav, "full details, posts, eligibility and how to apply")
+            } else {
+                EligibilityCard(job, profile, onEdit = { nav.navigate("profile") })
 
-            DetailCard("Key facts") {
-                Fact("Last date", fmtDate(job.lastDate))
-                job.startDate?.let { Fact("Applications from", fmtDate(it)) }
-                job.totalVacancies?.let { Fact("Vacancies", "$it") }
-                if (job.payLevelMin != null) Fact("Pay level", if (job.payLevelMax != null && job.payLevelMax != job.payLevelMin)
-                    "Level ${job.payLevelMin}–${job.payLevelMax} (7th CPC)" else "Level ${job.payLevelMin} (7th CPC)")
-                job.qualificationSummary?.let { Fact("Qualification", it) }
-                if (job.ageMax != null || job.ageMin != null) Fact("Age", listOfNotNull(job.ageMin?.let { "min $it" },
-                    job.ageMax?.let { "max $it" }).joinToString(", ") + (job.ageAsOn?.let { " (as on ${fmtDate(it)})" } ?: ""))
-                job.ageNote?.let { Fact("Age relaxation", it) }
-                job.feeText?.let { Fact("Fee", it) }
-                job.applyMode?.let { Fact("Apply", it.replaceFirstChar { c -> c.uppercase() }) }
-                job.location?.let { Fact("Location", it) }
-                job.deputationTenure?.let { Fact("Deputation period", it) }
-                job.eligibleCadre?.let { Fact("Who can apply", it) }
-            }
-
-            job.summary?.let { DetailCard("About") { Text(it) } }
-
-            if (job.posts.isNotEmpty()) DetailCard("Posts") {
-                job.posts.forEachIndexed { i, p ->
-                    if (i > 0) HorizontalDivider(Modifier.padding(vertical = 6.dp))
-                    Text(p.name, fontWeight = FontWeight.SemiBold)
-                    Text(listOfNotNull(p.vacancies?.let { "$it post(s)" }, p.payLevel?.let { "Level $it" }, p.payText)
-                        .joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    p.qualification?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                DetailCard("Key facts") {
+                    Fact("Last date", fmtDate(job.lastDate))
+                    job.startDate?.let { Fact("Applications from", fmtDate(it)) }
+                    job.totalVacancies?.let { Fact("Vacancies", "$it") }
+                    if (job.payLevelMin != null) Fact("Pay level", if (job.payLevelMax != null && job.payLevelMax != job.payLevelMin)
+                        "Level ${job.payLevelMin}–${job.payLevelMax} (7th CPC)" else "Level ${job.payLevelMin} (7th CPC)")
+                    job.qualificationSummary?.let { Fact("Qualification", it) }
+                    if (job.ageMax != null || job.ageMin != null) Fact("Age", listOfNotNull(job.ageMin?.let { "min $it" },
+                        job.ageMax?.let { "max $it" }).joinToString(", ") + (job.ageAsOn?.let { " (as on ${fmtDate(it)})" } ?: ""))
+                    job.ageNote?.let { Fact("Age relaxation", it) }
+                    job.feeText?.let { Fact("Fee", it) }
+                    job.applyMode?.let { Fact("Apply", it.replaceFirstChar { c -> c.uppercase() }) }
+                    job.location?.let { Fact("Location", it) }
+                    job.deputationTenure?.let { Fact("Deputation period", it) }
+                    job.eligibleCadre?.let { Fact("Who can apply", it) }
                 }
-            }
 
-            job.howToApply?.let { DetailCard("How to apply") { Text(it) } }
+                job.summary?.let { DetailCard("About") { Text(it) } }
+
+                if (job.posts.isNotEmpty()) DetailCard("Posts") {
+                    job.posts.forEachIndexed { i, p ->
+                        if (i > 0) HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                        Text(p.name, fontWeight = FontWeight.SemiBold)
+                        Text(listOfNotNull(p.vacancies?.let { "$it post(s)" }, p.payLevel?.let { "Level $it" }, p.payText)
+                            .joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        p.qualification?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    }
+                }
+
+                job.howToApply?.let { DetailCard("How to apply") { Text(it) } }
+            }
 
             Column(Modifier.padding(16.dp)) {
                 Button(onClick = { openUrl(ctx, job.noticeUrl) }, modifier = Modifier.fillMaxWidth()) {

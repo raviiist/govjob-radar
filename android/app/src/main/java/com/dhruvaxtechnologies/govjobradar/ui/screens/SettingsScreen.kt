@@ -34,7 +34,6 @@ import androidx.navigation.NavHostController
 import com.dhruvaxtechnologies.govjobradar.BuildConfig
 import com.dhruvaxtechnologies.govjobradar.GovJobApp
 import com.dhruvaxtechnologies.govjobradar.sync.Notifier
-import com.dhruvaxtechnologies.govjobradar.ui.Disclaimer
 import com.dhruvaxtechnologies.govjobradar.ui.SectionTitle
 import com.dhruvaxtechnologies.govjobradar.ui.openUrl
 import kotlinx.coroutines.launch
@@ -58,6 +57,11 @@ fun SettingsScreen(nav: NavHostController) {
     }) { pad ->
         Column(Modifier.padding(pad).verticalScroll(rememberScrollState())) {
             Row("My profile", "State, date of birth, qualification, category, pay level, notifications") { nav.navigate("profile") }
+            val unlocked by app.billing.unlocked.collectAsState()
+            Row(if (unlocked) "Full app unlocked ✓" else "Unlock full app",
+                if (unlocked) "Thank you for your support" else app.billing.trialDaysLeft().let {
+                    if (it > 0) "Free trial: $it day(s) left · restore an earlier purchase here" else "Free trial ended · or restore an earlier purchase"
+                }) { nav.navigate("unlock") }
             if (!Notifier.allowed(ctx)) Row("Notifications are off", "Tap to allow reminders and the morning summary") {
                 ctx.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -72,10 +76,15 @@ fun SettingsScreen(nav: NavHostController) {
                 Modifier.padding(16.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             HorizontalDivider()
 
-            SectionTitle("About")
-            Text("Disclaimer", Modifier.padding(horizontal = 16.dp), fontWeight = FontWeight.SemiBold)
-            Text(Disclaimer.FULL, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodyMedium)
+            SectionTitle("About & disclaimer")
+            com.dhruvaxtechnologies.govjobradar.ui.DisclaimerContent(Modifier.padding(horizontal = 16.dp))
             Row("Privacy policy", "$site/privacy.html") { openUrl(ctx, "$site/privacy.html") }
+            Row("Share GovJob Radar", "Tell friends and colleagues") {
+                val link = "https://play.google.com/store/apps/details?id=${ctx.packageName}"
+                ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
+                    .putExtra(Intent.EXTRA_TEXT, "GovJob Radar – Central, State and Deputation government vacancies, " +
+                        "updated every night from official websites: $link"), "Share app").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
             Row("Official sources (${feed.sources.size})", "Websites checked every night") { }
             feed.sources.sortedBy { it.name }.forEach { s ->
                 Text("• ${s.name}${s.state?.let { " ($it)" } ?: ""}", Modifier.fillMaxWidth().clickable { openUrl(ctx, s.home) }

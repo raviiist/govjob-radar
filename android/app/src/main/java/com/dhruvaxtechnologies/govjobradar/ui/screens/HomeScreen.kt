@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.Bookmarks
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
@@ -88,7 +89,12 @@ fun HomeScreen(nav: NavHostController, initialTab: String) {
     var refreshing by remember { mutableStateOf(false) }
     var refreshMsg by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val isAdmin = remember { app.admin.isAdmin() }
+    var isAdmin by remember { mutableStateOf(app.admin.isAdmin()) }
+    // Re-check when coming back from Settings (e.g. right after developer sign-in).
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        isAdmin = app.admin.isAdmin()
+        onPauseOrDispose { }
+    }
 
     fun refresh() = scope.launch {
         refreshing = true
@@ -103,13 +109,14 @@ fun HomeScreen(nav: NavHostController, initialTab: String) {
     if (showDisclaimer) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { },
-            title = { Text("Please read") },
+            icon = { Icon(Icons.Outlined.Info, null) },
+            title = { Text("Before you use GovJob Radar") },
             text = { Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
-                Text(com.dhruvaxtechnologies.govjobradar.ui.Disclaimer.FULL)
+                com.dhruvaxtechnologies.govjobradar.ui.DisclaimerContent()
             } },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { app.prefs.disclaimerAccepted = true; showDisclaimer = false }) {
-                    Text("I understand")
+                    Text("I understand, I'll check the official notice")
                 }
             },
         )
@@ -152,6 +159,15 @@ fun HomeScreen(nav: NavHostController, initialTab: String) {
         Box(Modifier.padding(pad).fillMaxSize()) {
             Column {
                 refreshMsg?.let { InfoBanner(it, MaterialTheme.colorScheme.error) { refreshMsg = null } }
+                val unlocked by app.billing.unlocked.collectAsState()
+                if (!unlocked && !isAdmin) {
+                    val d = app.billing.trialDaysLeft()
+                    // Deliberately quiet: small, light text.
+                    Text(if (d > 0) "Free trial · $d day${if (d == 1) "" else "s"} left" else "Free trial ended · tap to unlock the full app",
+                        Modifier.fillMaxWidth().clickable { nav.navigate("unlock") }.padding(horizontal = 16.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (d > 0) 0.55f else 0.8f))
+                }
                 if (feed.jobs.isEmpty() && feed.generatedAt.isEmpty()) {
                     EmptyState(if (refreshing) "Getting the latest jobs…" else "No jobs downloaded yet",
                         "Jobs are updated every night from official websites.")
@@ -325,7 +341,7 @@ private fun DeputationTab(nav: NavHostController, all: List<Job>, app: GovJobApp
         }
         if (shown.isEmpty()) item { EmptyState("No deputation vacancies here right now", "New circulars are checked every night.") }
         items(shown, key = { it.id }) { j ->
-            JobCard(j, profile, j.id in saved, { app.prefs.toggleSaved(j.id); com.dhruvaxtechnologies.govjobradar.sync.Scheduler.syncReminders(app) }) {
+            JobCard(j, profile, j.id in saved, { com.dhruvaxtechnologies.govjobradar.ui.toggleSaveGuarded(app, nav, j.id) }) {
                 nav.navigate("job/${j.id}")
             }
         }
@@ -370,7 +386,7 @@ private fun MyJobsTab(nav: NavHostController, app: GovJobApp, saved: Set<String>
             }, if (seg == "saved") "Tap the bookmark on any job to save it." else "Check again tomorrow morning.")
         }
         items(list, key = { it.id }) { j ->
-            JobCard(j, profile, j.id in saved, { app.prefs.toggleSaved(j.id); com.dhruvaxtechnologies.govjobradar.sync.Scheduler.syncReminders(app) }) {
+            JobCard(j, profile, j.id in saved, { com.dhruvaxtechnologies.govjobradar.ui.toggleSaveGuarded(app, nav, j.id) }) {
                 nav.navigate("job/${j.id}")
             }
         }

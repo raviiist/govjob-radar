@@ -156,6 +156,7 @@ class DigestWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         val app = applicationContext as GovJobApp
         val ids = app.prefs.pendingDigest
         app.prefs.pendingDigest = emptySet()
+        if (!app.fullAccess()) return Result.success()      // morning alerts are part of the full app
         val extended = ids.filter { it.startsWith("ext:") }.mapNotNull { app.repo.job(it.removePrefix("ext:")) }
         val fresh = ids.filterNot { it.startsWith("ext:") }.mapNotNull { app.repo.job(it) }
             .filter { (it.daysLeft() ?: 0) >= 0 }
@@ -189,6 +190,7 @@ class ReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         val days = inputData.getInt("days", 1)
         val job = app.repo.job(id) ?: return Result.success()
         if (id !in app.prefs.saved.value || job.lastDate != date) return Result.success()  // unsaved or date changed
+        if (!app.fullAccess()) return Result.success()
         try {
             Notifier.post(app, id.hashCode(), Notifier.CH_REMIND,
                 if (days == 1) "Last date tomorrow" else "Last date in $days days",

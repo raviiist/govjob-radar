@@ -157,3 +157,24 @@ fun InfoBanner(text: String, color: Color, onClick: (() -> Unit)? = null) {
         Text(text, Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
     }
 }
+
+
+/** Saving jobs (with reminders) is part of the full app; un-saving is always allowed. */
+fun toggleSaveGuarded(app: com.dhruvaxtechnologies.govjobradar.GovJobApp, nav: androidx.navigation.NavHostController, id: String) {
+    if (id !in app.prefs.saved.value && !app.fullAccess()) { nav.navigate("unlock"); return }
+    app.prefs.toggleSaved(id)
+    com.dhruvaxtechnologies.govjobradar.sync.Scheduler.syncReminders(app)
+}
+
+@Composable
+fun LockedCard(nav: androidx.navigation.NavHostController, what: String) {
+    Card(onClick = { nav.navigate("unlock") }, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+        Column(Modifier.padding(14.dp)) {
+            Text("Free trial ended", fontWeight = FontWeight.Bold)
+            Text("Unlock the full app to see $what. The official notification below is always free.",
+                style = MaterialTheme.typography.bodyMedium)
+            Text("Unlock →", Modifier.padding(top = 6.dp), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        }
+    }
+}

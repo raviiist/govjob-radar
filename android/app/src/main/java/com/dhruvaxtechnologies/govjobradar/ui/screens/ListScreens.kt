@@ -1,6 +1,7 @@
 package com.dhruvaxtechnologies.govjobradar.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -72,7 +73,7 @@ fun JobListScreen(nav: NavHostController, title: String, level: String?, sector:
 
 @Composable
 private fun Card(nav: NavHostController, app: GovJobApp, j: Job, profile: com.dhruvaxtechnologies.govjobradar.data.Profile, saved: Set<String>) {
-    JobCard(j, profile, j.id in saved, { app.prefs.toggleSaved(j.id); Scheduler.syncReminders(app) }) { nav.navigate("job/${j.id}") }
+    JobCard(j, profile, j.id in saved, { com.dhruvaxtechnologies.govjobradar.ui.toggleSaveGuarded(app, nav, j.id) }) { nav.navigate("job/${j.id}") }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,6 +94,10 @@ fun SearchScreen(nav: NavHostController) {
         TopAppBar(title = { Text("Search") },
             navigationIcon = { IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } })
     }) { pad ->
+        if (!app.fullAccess()) {
+            Column(Modifier.padding(pad)) { com.dhruvaxtechnologies.govjobradar.ui.LockedCard(nav, "search across all vacancies") }
+            return@Scaffold
+        }
         LazyColumn(Modifier.padding(pad)) {
             item {
                 OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth().padding(12.dp), singleLine = true,

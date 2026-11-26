@@ -21,8 +21,8 @@ android {
         applicationId = "com.dhruvaxtechnologies.govjobradar"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
 
         buildConfigField("String", "FEED_BASE_URL", cfgStr("FEED_BASE_URL"))
         buildConfigField("String", "ADMIN_EMAIL", cfgStr("ADMIN_EMAIL"))
@@ -99,6 +99,7 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
 
+    implementation("com.android.billingclient:billing-ktx:8.0.0")
     implementation("androidx.credentials:credentials:1.5.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")

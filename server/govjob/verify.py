@@ -54,6 +54,8 @@ def build_job(ai: dict, *, source: dict, notice_url: str, page_url: str, link_te
     doc_type = ai.get("doc_type") or "other"
     kind = "deputation" if doc_type == "deputation" or source.get("kind") == "deputation" and doc_type != "recruitment" \
         else "recruitment"
+    if re.search(r"deputation|प्रतिनियुक्ति", f"{ai.get('title') or ''} {link_text}", re.I):
+        kind = "deputation"
     sector = ai.get("sector") if ai.get("sector") in SECTORS else source.get("sector", "other")
     level = ai.get("level") if ai.get("level") in ("central", "state") else source["level"]
     state = ai.get("state") or source.get("state") if level == "state" else None

@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         (application as GovJobApp).healthCheckOnOpen()
+        (application as GovJobApp).billing.start()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -98,5 +99,6 @@ fun AppNav(nav: NavHostController, start: String) {
         composable("search") { SearchScreen(nav) }
         composable("settings") { SettingsScreen(nav) }
         composable("admin") { AdminScreen(nav) }
+        composable("unlock") { com.dhruvaxtechnologies.govjobradar.ui.screens.UnlockScreen(nav) }
     }
 }

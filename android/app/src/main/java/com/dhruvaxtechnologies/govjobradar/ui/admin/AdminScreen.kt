@@ -151,7 +151,7 @@ private fun ReviewTab(items: List<ReviewItem>, act: (suspend () -> Unit) -> Unit
     if (items.isEmpty()) { EmptyState("Nothing to review", "All new notices passed the checks and went live automatically."); return }
     LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
-            Text("Approved items reach users at the next publish (within ~2 hours).", Modifier.padding(12.dp),
+            Text("Approved items reach users at the next publish (within about an hour).", Modifier.padding(12.dp),
                 style = MaterialTheme.typography.labelSmall)
         }
         val clean = items.filter { app.admin.onlyNewSource(it) }

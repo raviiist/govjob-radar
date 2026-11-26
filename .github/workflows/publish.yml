@@ -1,11 +1,11 @@
 name: publish
 
 # Builds the public job feed from Firestore and deploys it to GitHub Pages.
-# Runs every 2 hours (so jobs you approve in Admin > Review go live within ~2 h)
+# Runs every hour (so jobs you approve in Admin > Review go live within ~1 h)
 # and right after the nightly crawl.
 on:
   schedule:
-    - cron: "23 */2 * * *"
+    - cron: "23 * * * *"        # hourly (GitHub sometimes skips a scheduled run)
   workflow_dispatch:
     inputs:
       force:

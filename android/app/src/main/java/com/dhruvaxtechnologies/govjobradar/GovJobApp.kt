@@ -20,6 +20,10 @@ class GovJobApp : Application() {
     lateinit var repo: Repository
     lateinit var reporter: Reporter
     lateinit var admin: AdminRepo
+    lateinit var billing: com.dhruvaxtechnologies.govjobradar.data.Billing
+
+    /** Trial running, app bought, or the developer signed in. */
+    fun fullAccess(): Boolean = billing.unlocked.value || billing.trialActive || admin.isAdmin()
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
@@ -29,6 +33,8 @@ class GovJobApp : Application() {
         reporter.installCrashHandler()
         repo = Repository(this, prefs)
         admin = AdminRepo(this)
+        billing = com.dhruvaxtechnologies.govjobradar.data.Billing(this, scope)
+        billing.start()
         FirebaseBridge.init(this)
         Notifier.createChannels(this)
         Scheduler.scheduleNightly(this, prefs.profile.value.wifiOnly, ExistingPeriodicWorkPolicy.KEEP)

@@ -61,10 +61,14 @@ Dates as YYYY-MM-DD (Indian documents write day first).
 
 JSON keys:
 "doc_type": "recruitment" | "deputation" | "corrigendum" | "result" | "admit_card" | "other"
+   - Use "other" for anything that does not invite applications for specific posts: competitions, quizzes,
+     scholarships, recruitment/exam CALENDARS, job portals or links to portals, exam schedules, syllabi,
+     answer keys, results, lists of selected candidates, tenders, internships without posts.
    - "deputation": posts to be filled on deputation / absorption / short-term contract from serving
      government employees ("through proper channel", "officers holding analogous posts").
    - "corrigendum": a change to an earlier advertisement (date extension, re-opening, change in posts).
-"title": short clear title, e.g. "Scientist/Engineer 'SC' – 63 posts"
+"title": short clear title IN ENGLISH (translate if the notice is in Hindi or another language),
+   e.g. "Scientist/Engineer 'SC' – 63 posts"
 "organisation": recruiting organisation
 "advt_no": advertisement number exactly as written, or null
 "level": "central" | "state"
@@ -86,7 +90,7 @@ JSON keys:
 "apply_url": str|null  (only if written in the document)
 "location": str|null
 "how_to_apply": one or two short sentences|null
-"summary": two short plain-English sentences for a job seeker
+"summary": two short plain-English sentences for a job seeker (always English)
 "deputation_tenure": str|null, "eligible_cadre": str|null  (deputation only)
 "corrigendum": {{"refers_to_advt_no": str|null, "refers_to_title": str|null, "new_last_date": "YYYY-MM-DD"|null, "old_last_date": "YYYY-MM-DD"|null, "what_changed": str|null}} | null
 "evidence": {{"last_date_text": verbatim text that states the (latest) last date, or null,

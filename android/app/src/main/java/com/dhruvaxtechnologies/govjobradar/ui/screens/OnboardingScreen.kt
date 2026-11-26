@@ -137,8 +137,8 @@ fun OnboardingScreen(editing: Boolean = false, onDone: () -> Unit) {
             if (!editing) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
                     Column(Modifier.padding(12.dp)) {
-                        Text("Please read", fontWeight = FontWeight.Bold)
-                        Text(com.dhruvaxtechnologies.govjobradar.ui.Disclaimer.FULL, style = MaterialTheme.typography.bodyMedium)
+                        Text("Before you start", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        com.dhruvaxtechnologies.govjobradar.ui.DisclaimerContent()
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(accepted, { accepted = it })
                             Text("I understand and will check the official notification before applying")
