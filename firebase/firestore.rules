@@ -1,8 +1,7 @@
 rules_version = '2';
 
 // GovJob Radar — Firestore security rules.
-// Replace YOUR_ADMIN_GMAIL@gmail.com below (one place) with your own Gmail, then paste the
-// whole file into Firebase console > Firestore Database > Rules > Publish.
+// Admin Gmail is set below. Paste the into Firebase console > Firestore Database > Rules > Publish.
 //
 // - The nightly server uses a service account and is not limited by these rules.
 // - Phones sign in anonymously and may ONLY create small problem reports.
@@ -12,7 +11,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return request.auth != null
-        && request.auth.token.email == 'YOUR_ADMIN_GMAIL@gmail.com'
+        && request.auth.token.email == 'sherlockadbone@gmail.com'
         && request.auth.token.email_verified == true;
     }
 
