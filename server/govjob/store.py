@@ -50,6 +50,7 @@ class BaseStore:
              source_id: str | None = None, job_id: str | None = None, run_url: str | None = None,
              hint: str | None = None):
         key = sha(f"{origin}|{code}|{source_id or ''}|{job_id or ''}", 20)
+        print(f"[{severity.upper()}] {code}{' (' + source_id + ')' if source_id else ''}: {message[:400]}", flush=True)
         self._write_error(key, {
             "origin": origin, "code": code, "message": message[:1500], "severity": severity,
             "source_id": source_id, "job_id": job_id, "run_url": run_url, "hint": hint,

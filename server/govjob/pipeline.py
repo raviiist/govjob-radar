@@ -87,6 +87,8 @@ class Nightly:
         self.store.load_jobs()
         sources = [s for s in self.cfg["sources"] if not only or s["id"] in only]
         self.stats.sources_total = len(sources)
+        print(f"AI: key {'set (' + str(len(self.ai.key)) + ' chars)' if self.ai and self.ai.key else 'MISSING'}, "
+              f"model {self.ai.model if self.ai else '-'}", flush=True)
         if self.ai is None or not self.ai.key:
             self.flag("AI_KEY_MISSING", "GEMINI_API_KEY is not set, new notices cannot be read.",
                       severity="critical", hint="Add the GEMINI_API_KEY secret in the GitHub repository settings.")
@@ -190,6 +192,7 @@ class Nightly:
             self.store.set_source(sid, {"fail_count": fails, "last_error": reason, "last_error_code": code,
                                         "last_checked": iso(now_utc())})
             self.stats.sources_failed += 1
+            print(f"source {sid}: FAILED ({code}) {reason[:200]}", flush=True)
             if fails >= SOURCE_FAIL_NIGHTS:
                 hint = {
                     "BLOCKED": "The site refuses GitHub's servers (often blocks foreign IPs). Consider a "
@@ -203,6 +206,7 @@ class Nightly:
             return
 
         self.stats.sources_ok += 1
+        print(f"source {sid}: ok, {len(cands)} notices on {used_url}", flush=True)
         self.store.set_source(sid, {"listing_url": used_url, "fail_count": 0, "last_ok": iso(now_utc()),
                                     "last_checked": iso(now_utc()), "last_candidates": len(cands),
                                     "last_error": None, "tls_problem": bool(last_fetch and last_fetch.tls_fallback)})
