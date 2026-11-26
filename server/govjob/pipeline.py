@@ -359,6 +359,7 @@ class Nightly:
                                   source_is_new=source_is_new)
         if decision == "drop":
             self.stats.dropped += 1
+            print(f"  skipped: {job['title'][:90]} | {'; '.join(reasons)}", flush=True)
             return True
         existing = self.store.jobs.get(job["id"])
         if existing:
@@ -376,6 +377,9 @@ class Nightly:
             return True
         job["status"] = "live" if decision == "publish" else "pending_review"
         job["review_reasons"] = reasons
+        print(f"  {'LIVE' if decision == 'publish' else 'REVIEW'}: {job['title'][:90]} | last date {job['last_date']}"
+              f"{' (extended)' if job.get('extended') else ''}{' | ' + '; '.join(reasons)[:200] if reasons else ''}",
+              flush=True)
         self.store.put_job(job)
         if decision == "publish":
             self.stats.published += 1
@@ -549,6 +553,8 @@ class Nightly:
 
     def _check_link(self, job: dict):
         f = self.fetch.get(job["notice_url"], head_only=True)
+        if job.get("status") == "link_broken" and f.error_code not in ("HTTP_404", "HTTP_410", "DNS"):
+            f.error, f.status = "", 200     # hidden earlier only because the site refused our server
         if f.ok:
             job["link_fail_count"] = 0
             job["verified_at"] = iso(now_utc())
@@ -556,6 +562,11 @@ class Nightly:
                 ld = parse_date(job.get("last_date"))
                 job["status"] = "live" if not ld or ld >= self.today else "awaiting_extension_check"
                 self.store.resolve("LINK_BROKEN", job_id=job["id"], source_id=job["source_id"])
+            self.store.put_job(job)
+            return
+        if f.error_code not in ("HTTP_404", "HTTP_410", "DNS"):
+            # Refused / timed out / server error: the site may only be blocking our server. Not proof the
+            # link is dead, so keep the job visible.
             self.store.put_job(job)
             return
         job["link_fail_count"] = int(job.get("link_fail_count", 0)) + 1
