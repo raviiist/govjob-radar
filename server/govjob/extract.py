@@ -19,7 +19,11 @@ JOB_WORDS = re.compile(
 SKIP_WORDS = re.compile(
     r"\btender|\brti\b|annual report|\bresult|answer key|admit card|e-?admit|call letter|"
     r"syllabus|marks|cut[- ]?off|interview schedule|press release|photo gallery|"
-    r"auction|quotation|\beoi\b|expression of interest|newsletter|holiday", re.IGNORECASE)
+    r"auction|quotation|\beoi\b|expression of interest|newsletter|holiday|supplier|vendor|\bbid\b|"
+    r"investor|shareholder|dividend|annual general|csr\b|procurement", re.IGNORECASE)
+# Pages that are never vacancy listings (checked on the page address and link text).
+NON_JOB_PAGES = re.compile(r"supplier|vendor|tender|investor|shareholder|procurement|e-?auction|press-?release|"
+                           r"media|gallery|annual-?report|csr", re.IGNORECASE)
 CORRIGENDUM_WORDS = re.compile(r"corrigendum|addendum|extension|extended|extend|revised|re-?open|शुद्धिपत्र",
                                re.IGNORECASE)
 LISTING_WORDS = re.compile(
@@ -94,6 +98,8 @@ def listing_link_candidates(links: list[Link]) -> list[Link]:
     """Links on a home page that may lead to the recruitment / careers page."""
     scored = []
     for l in links:
+        if NON_JOB_PAGES.search(l.url) or NON_JOB_PAGES.search(l.text):
+            continue
         s = 0
         if LISTING_WORDS.search(l.text):
             s += 3

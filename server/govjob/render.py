@@ -53,8 +53,16 @@ class Renderer:
             except Exception:
                 pass
             time.sleep(1.5)
+            for _ in range(3):      # some sites are still redirecting/redrawing: wait and try again
+                try:
+                    html = page.content()
+                    break
+                except Exception:
+                    time.sleep(3)
+            else:
+                html = page.content()
             self.pages += 1
-            return page.url, page.content()
+            return page.url, html
         except Exception as e:
             self.failures += 1
             print(f"  render failed for {url}: {type(e).__name__}: {str(e)[:160]}", flush=True)
