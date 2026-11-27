@@ -328,3 +328,14 @@ def test_javascript_site_is_read_with_browser():
     n._read_document = lambda url, src: Bundle(notice_url=url, docs=[url], parts=[empty[url]])
     n.run()
     assert len(st.jobs) == 1 and st.sources["isro"].get("needs_js")
+
+
+def test_only_government_endings_are_trusted():
+    from govjob.util import domain_allowed
+    suf = [".gov.in", ".nic.in", ".mil.in"]
+    home = "https://www.isro.gov.in"
+    assert domain_allowed("https://ursc.gov.in/a.pdf", home, [], suf)
+    assert not domain_allowed("https://jobs-isro.org.in/a.pdf", home, [], suf)       # anyone can register .org.in
+    assert not domain_allowed("https://xyzcollege.ac.in/a.pdf", home, [], suf)       # private colleges use .ac.in
+    assert domain_allowed("https://careers.ntpc.co.in/a", "https://careers.ntpc.co.in", ["ntpc.co.in"], suf)
+    assert not domain_allowed("https://ntpc-careers.co.in/a", "https://careers.ntpc.co.in", ["ntpc.co.in"], suf)

@@ -563,6 +563,16 @@ class Nightly:
     def lifecycle(self):
         for job in list(self.store.jobs.values()):
             status = job.get("status")
+            # Re-check the source of every open job against the current trusted-domain rule.
+            if status in ("live", "awaiting_extension_check", "pending_review"):
+                src = next((x for x in self.cfg["sources"] if x["id"] == job.get("source_id")), None)
+                if src and not domain_allowed(job.get("notice_url", ""), src["home"], src.get("domains", []),
+                                              self.suffixes):
+                    job["status"] = "pending_review"
+                    job["review_reasons"] = ["Notice is not on a government-only domain — check that the website "
+                                             f"is the real official one: {job.get('notice_url')}"]
+                    self.store.put_job(job)
+                    continue
             # New extension / corrigendum PDFs on the job's own page (checked before expiry decisions).
             if status in ("live", "awaiting_extension_check", "pending_review") and job.get("detail_url"):
                 try:

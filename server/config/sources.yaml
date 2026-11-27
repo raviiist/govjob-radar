@@ -22,8 +22,10 @@
 # ==========================================================================================
 
 defaults:
-  # Domains every source may link to (official government suffixes)
-  official_suffixes: [".gov.in", ".nic.in", ".ac.in", ".res.in", ".edu.in", ".mil.in", ".org.in"]
+  # Domain endings ANY source may link to. Only endings that are reserved for the Government of India.
+  # (.ac.in, .edu.in, .res.in and .org.in are NOT on this list: private colleges and anyone else can
+  #  register those. A source that really uses one lists it under its own "domains".)
+  official_suffixes: [".gov.in", ".nic.in", ".mil.in"]
   max_new_notices_per_source: 20
   max_listing_pages: 6
   max_age_days: 120
@@ -52,7 +54,7 @@ sources:
   - {id: barc, name: "BARC", level: central, sector: space_research, kind: mixed,
      home: "https://www.barc.gov.in"}
   - {id: csir, name: "CSIR", level: central, sector: space_research, kind: mixed,
-     home: "https://www.csir.res.in"}
+     home: "https://www.csir.res.in", domains: ["csir.res.in"]}
 
   # ---------------- Defence & paramilitary ----------------
   - {id: army, name: "Indian Army", level: central, sector: defence, kind: recruitment,
