@@ -67,7 +67,7 @@ sources:
      home: "https://www.mod.gov.in"}
   - {id: crpf, name: "CRPF", level: central, sector: police, kind: mixed, home: "https://crpf.gov.in"}
   - {id: bsf, name: "BSF", level: central, sector: police, kind: mixed, home: "https://bsf.gov.in"}
-  - {id: cisf, name: "CISF", level: central, sector: police, kind: mixed, home: "https://cisf.gov.in"}
+  - {id: cisf, name: "CISF", level: central, sector: police, kind: mixed, home: "https://cisf.gov.in", hints: ["https://cisfrectt.cisf.gov.in/"]}
   - {id: itbp, name: "ITBP", level: central, sector: police, kind: mixed, home: "https://itbpolice.nic.in"}
   - {id: mha, name: "Ministry of Home Affairs", level: central, sector: police, kind: deputation,
      home: "https://www.mha.gov.in", hints: ["https://www.mha.gov.in/en/notifications/vacancies"]}
