@@ -17,7 +17,7 @@ concurrency:
 jobs:
   check:
     runs-on: self-hosted
-    timeout-minutes: 60
+    timeout-minutes: 120
     env:
       FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -32,6 +32,7 @@ jobs:
           python3 -m venv "$HOME/.gjr-venv"
           "$HOME/.gjr-venv/bin/pip" install -q -r server/requirements.txt lxml playwright
           echo "$HOME/.gjr-venv/bin" >> "$GITHUB_PATH"
+          "$HOME/.gjr-venv/bin/python" -m playwright install chromium || echo "::warning::browser download failed"
       - name: Check the file
         run: python -c "import sys; sys.path.insert(0,'server'); from govjob.sources import load; c=load('server/config/sources.yaml'); print(len(c['sources']), 'sources OK')"
       - name: Find added or changed sources
@@ -41,13 +42,16 @@ jobs:
           import subprocess, sys, yaml
           sys.path.insert(0, 'server')
           from govjob.sources import load
-          new = {s['id']: s for s in load('server/config/sources.yaml')['sources']}
+          load('server/config/sources.yaml')          # validates; raises a clear error if wrong
+          new = {s['id']: s for s in (yaml.safe_load(open('server/config/sources.yaml')).get('sources') or [])}
           try:
               old_txt = subprocess.run(['git', 'show', 'HEAD^:server/config/sources.yaml'], capture_output=True, text=True, check=True).stdout
               old = {s['id']: s for s in (yaml.safe_load(old_txt).get('sources') or [])}
           except Exception:
               old = {}
           ids = [i for i, s in new.items() if old.get(i) != s]
+          if len(ids) > 15:   # file reorganised or many added: test the first 15, the nightly run covers the rest
+              ids = ids[:15]
           print('ids=' + ' '.join(ids))
           PY
       - name: Test-crawl them
