@@ -304,3 +304,27 @@ def test_first_seen_after_extension_reads_both_documents(monkeypatch):
     run_dos(st, DOS_PAGE_2, date(2026, 11, 26), monkeypatch)
     j = next(iter(st.jobs.values()))
     assert j["last_date"] == "2026-11-30" and j["extended"] and j["status"] == "live", (j.get("review_reasons"), j)
+
+
+class FakeRenderer:
+    available = True
+    error = None
+
+    def __init__(self, pages):
+        self.p = pages
+        self.pages = 0
+
+    def html(self, url, timeout_ms=0):
+        self.pages += 1
+        return (url, self.p[url]) if url in self.p else None
+
+
+def test_javascript_site_is_read_with_browser():
+    st = new_store()
+    empty = {"https://www.isro.gov.in": "<div id='root'></div>", "https://www.isro.gov.in/docs/advt01.pdf": ADVT_TEXT}
+    r = FakeRenderer({"https://www.isro.gov.in": HOME, "https://www.isro.gov.in/Careers.html": CAREERS})
+    n = Nightly(st, CFG, FakeAI({"https://www.isro.gov.in/docs/advt01.pdf": AI_ADVT}), fetcher=FakeFetcher(empty),
+                today=TODAY, renderer=r)
+    n._read_document = lambda url, src: Bundle(notice_url=url, docs=[url], parts=[empty[url]])
+    n.run()
+    assert len(st.jobs) == 1 and st.sources["isro"].get("needs_js")

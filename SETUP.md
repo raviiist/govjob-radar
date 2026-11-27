@@ -107,3 +107,23 @@ Free accounts' idle servers can be reclaimed by Oracle; upgrading the account to
 
 Edit `server/config/sources.yaml` (one line per source). You never need to fix page links: if a site moves its
 recruitment page, the crawler finds it again from the home page and tells you (SOURCE_MOVED, info only).
+
+
+## Reliable timing (run once on the Oracle server)
+
+GitHub's own timer is often hours late, so the India server starts the jobs itself.
+1. GitHub → your photo → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** →
+   Generate new token. Name `govjob-scheduler`, expiration: the longest offered, Repository access: **Only
+   select repositories → govjob-radar**, Permissions → Repository → **Actions: Read and write**. Generate, copy.
+2. Oracle Cloud Shell → connect to the server (`ssh -i ssh-key-*.key ubuntu@PUBLIC_IP`), then:
+   ```
+   curl -fsSLO https://raw.githubusercontent.com/raviiist/govjob-radar/main/server/oracle-schedule-setup.sh
+   sudo bash oracle-schedule-setup.sh YOUR_TOKEN
+   ```
+   It must print `HTTP 204`. It also installs the browser libraries needed to read JavaScript websites.
+3. When the token expires, repeat with a new token (Admin › Health turns red if the crawl stops).
+
+## Adding a website
+
+See the instructions at the top of `server/config/sources.yaml`. After you commit, Actions › **sources-check**
+test-crawls the new website and shows the result.

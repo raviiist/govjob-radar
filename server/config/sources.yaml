@@ -1,25 +1,25 @@
 # Official sources crawled every night.
 #
-# You do NOT need to keep the "hints" URLs up to date: if a hint stops working,
-# the crawler opens the home page and finds the recruitment / careers page again
-# on its own (and remembers it). Only add or remove whole sources here.
+# ===================== HOW TO ADD A WEBSITE (from your phone or PC) =====================
+# 1. On GitHub open this file and tap the pencil (Edit).
+# 2. Copy one line at the END of the file and change it. Only 4 things are needed:
 #
-# Fields:
-#   id      unique short id (never change it after first run)
-#   name    shown in the app
-#   level   central | state
-#   state   state name (state sources only)
-#   sector  defence | police | space_research | railways | banking | civil_services | ssc |
-#           psu | teaching | health | postal | judiciary | engineering | other
-#           (default sector; the AI can still classify each notice differently)
-#   kind    recruitment | deputation | mixed  (mixed = the AI decides per notice)
-#   home    official home page
-#   hints   optional likely listing pages (tried first)
-#   domains extra official domains this source may link to (its own domain is always allowed)
+#    - {id: ka_forest, name: "Karnataka Forest Department", level: state, state: "Karnataka", home: "https://aranya.gov.in"}
+#    - {id: nhai, name: "NHAI", level: central, home: "https://nhai.gov.in"}
 #
-# NOTE: these URLs were written from knowledge, not tested from the build machine.
-# Any that are wrong or blocked will show up in the app's Admin > Errors tab after
-# the first night, with the reason.
+#      id     short unique name: small letters, digits and _ only (never change it later)
+#      name   shown in the app
+#      level  central or state   (state sources also need  state: "<State name>")
+#      home   the website's main address (https://...). Any page of the site is fine: the crawler
+#             finds the recruitment / careers / vacancies pages by itself.
+#    Optional: sector (defence, police, space_research, railways, banking, civil_services, ssc, psu,
+#              teaching, health, postal, judiciary, engineering, other), kind (recruitment, deputation,
+#              mixed), hints: ["exact vacancies page"], domains: ["other domain the site uses"]
+# 3. Tap "Commit changes". Within a few minutes GitHub test-crawls the new website from the India
+#    server: Actions > sources-check > the newest run shows what was found or what is wrong.
+#    Notices from a new website go to Admin > Review in the app during its first week.
+# To stop crawling a website, delete its line.
+# ==========================================================================================
 
 defaults:
   # Domains every source may link to (official government suffixes)
@@ -108,7 +108,7 @@ sources:
   - {id: dst, name: "Department of Science & Technology", level: central, sector: space_research, kind: mixed,
      home: "https://dst.gov.in"}
   - {id: dbt, name: "Department of Biotechnology", level: central, sector: space_research, kind: mixed,
-     home: "https://dbtindia.gov.in"}
+     home: "https://www.dbtindia.gov.in"}
   - {id: mohfw, name: "Ministry of Health & Family Welfare", level: central, sector: health, kind: mixed,
      home: "https://mohfw.gov.in"}
   - {id: moe, name: "Ministry of Education", level: central, sector: teaching, kind: mixed,
@@ -175,3 +175,39 @@ sources:
      home: "https://www.trb.tn.gov.in"}
   - {id: up_upsssc, name: "UP Subordinate Services Selection Commission", level: state, state: "Uttar Pradesh", sector: ssc, kind: recruitment,
      home: "https://upsssc.gov.in"}
+
+  # ---------------- State: staff selection & police recruitment boards (added 27 Nov 2026) ----------------
+  - {id: hssc, name: "Haryana Staff Selection Commission", level: state, state: "Haryana", sector: ssc, kind: recruitment, home: "https://hssc.gov.in"}
+  - {id: hpsssb, name: "Himachal Pradesh Staff Selection board", level: state, state: "Himachal Pradesh", sector: ssc, kind: recruitment, home: "https://hpsssb.hp.gov.in"}
+  - {id: bssc, name: "Bihar Staff Selection Commission", level: state, state: "Bihar", sector: ssc, kind: recruitment, home: "https://bssc.bihar.gov.in"}
+  - {id: csbc_bihar, name: "Bihar Central Selection Board of Constable", level: state, state: "Bihar", sector: police, kind: recruitment, home: "https://csbc-bih.bihar.gov.in"}
+  - {id: jssc, name: "Jharkhand Staff Selection Commission", level: state, state: "Jharkhand", sector: ssc, kind: recruitment, home: "https://jssc.jharkhand.gov.in"}
+  - {id: osssc, name: "Odisha Sub-ordinate Staff Selection Commission", level: state, state: "Odisha", sector: ssc, kind: recruitment, home: "https://www.osssc.gov.in"}
+  - {id: uppbpb, name: "UP Police Recruitment & Promotion Board", level: state, state: "Uttar Pradesh", sector: police, kind: recruitment, home: "https://uppbpb.gov.in"}
+  - {id: mp_esb, name: "MP Employees Selection Board", level: state, state: "Madhya Pradesh", sector: ssc, kind: recruitment, home: "https://esb.mp.gov.in"}
+  - {id: cg_vyapam, name: "Chhattisgarh Vyapam", level: state, state: "Chhattisgarh", sector: ssc, kind: recruitment, home: "https://vyapam.cgstate.gov.in"}
+  - {id: rssb, name: "Rajasthan Staff Selection Board", level: state, state: "Rajasthan", sector: ssc, kind: recruitment, home: "https://rssb.rajasthan.gov.in"}
+  - {id: gsssb, name: "Gujarat Subordinate Service Selection Board", level: state, state: "Gujarat", sector: ssc, kind: recruitment, home: "https://gsssb.gujarat.gov.in"}
+  - {id: mahapolice, name: "Maharashtra Police", level: state, state: "Maharashtra", sector: police, kind: recruitment, home: "https://www.mahapolice.gov.in"}
+  - {id: psssb, name: "Punjab Subordinate Service Selection Board", level: state, state: "Punjab", sector: ssc, kind: recruitment, home: "https://sssb.punjab.gov.in"}
+  - {id: uksssc, name: "Uttarakhand Subordinate Service Selection Commission", level: state, state: "Uttarakhand", sector: ssc, kind: recruitment, home: "https://sssc.uk.gov.in"}
+  - {id: tnusrb, name: "Tamil Nadu Uniformed Services Recruitment Board", level: state, state: "Tamil Nadu", sector: police, kind: recruitment, home: "https://www.tnusrb.tn.gov.in"}
+  - {id: ksp, name: "Karnataka State Police", level: state, state: "Karnataka", sector: police, kind: recruitment, home: "https://ksp.karnataka.gov.in"}
+  - {id: ka_hc, name: "High Court of Karnataka", level: state, state: "Karnataka", sector: judiciary, kind: recruitment, home: "https://karnatakajudiciary.kar.nic.in"}
+  - {id: wbpolice, name: "West Bengal Police Recruitment", level: state, state: "West Bengal", sector: police, kind: recruitment, home: "https://wbpolice.gov.in"}
+  - {id: jkssb, name: "J&K Services Selection Board", level: state, state: "Jammu & Kashmir", sector: ssc, kind: recruitment, home: "https://jkssb.nic.in"}
+  - {id: dsssb, name: "Delhi Subordinate Services Selection Board", level: state, state: "Delhi", sector: ssc, kind: recruitment, home: "https://dsssb.delhi.gov.in"}
+  - {id: kerala_hc, name: "High Court of Kerala", level: state, state: "Kerala", sector: judiciary, kind: recruitment, home: "https://hckerala.gov.in"}
+
+  # ---------------- Central: insurance, PF and PSUs (added 27 Nov 2026) ----------------
+  - {id: esic, name: "ESIC", level: central, sector: health, kind: mixed, home: "https://www.esic.gov.in"}
+  - {id: epfo, name: "EPFO", level: central, sector: other, kind: mixed, home: "https://www.epfindia.gov.in"}
+  - {id: ntpc, name: "NTPC", level: central, sector: psu, kind: recruitment, home: "https://careers.ntpc.co.in", domains: ["ntpc.co.in"]}
+  - {id: ongc, name: "ONGC", level: central, sector: psu, kind: recruitment, home: "https://ongcindia.com", domains: ["ongcindia.com"]}
+  - {id: bhel, name: "BHEL", level: central, sector: psu, kind: recruitment, home: "https://careers.bhel.in", domains: ["bhel.in", "bhel.com"]}
+  - {id: sail, name: "SAIL", level: central, sector: psu, kind: recruitment, home: "https://sailcareers.com", domains: ["sailcareers.com", "sail.co.in"]}
+  - {id: bel, name: "Bharat Electronics (BEL)", level: central, sector: psu, kind: recruitment, home: "https://bel-india.in", domains: ["bel-india.in"]}
+  - {id: hal, name: "Hindustan Aeronautics (HAL)", level: central, sector: psu, kind: recruitment, home: "https://hal-india.co.in", domains: ["hal-india.co.in"]}
+  - {id: coalindia, name: "Coal India", level: central, sector: psu, kind: recruitment, home: "https://www.coalindia.in", domains: ["coalindia.in"]}
+  - {id: iocl, name: "Indian Oil (IOCL)", level: central, sector: psu, kind: recruitment, home: "https://iocl.com", domains: ["iocl.com"]}
+  - {id: aai, name: "Airports Authority of India", level: central, sector: psu, kind: recruitment, home: "https://www.aai.aero", domains: ["aai.aero"]}

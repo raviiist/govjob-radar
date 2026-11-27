@@ -6,14 +6,37 @@ import warnings
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
+import ssl
+
 import requests
 import urllib3
+from requests.adapters import HTTPAdapter
 
 from .util import host
 
 UA = ("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) "
       "Chrome/126.0 Mobile Safari/537.36 GovJobRadarBot/1.0 (+https://github.com/raviiist/govjob-radar)")
 MAX_BYTES = 30 * 1024 * 1024
+
+
+class LegacyTLSAdapter(HTTPAdapter):
+    """For old government servers that only speak outdated TLS settings (read-only public pages)."""
+
+    def init_poolmanager(self, *args, **kwargs):
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        try:
+            ctx.set_ciphers("DEFAULT:@SECLEVEL=0")
+        except ssl.SSLError:
+            pass
+        ctx.options |= getattr(ssl, "OP_LEGACY_SERVER_CONNECT", 0x4)
+        try:
+            ctx.minimum_version = ssl.TLSVersion.TLSv1
+        except (ValueError, AttributeError):
+            pass
+        kwargs["ssl_context"] = ctx
+        return super().init_poolmanager(*args, **kwargs)
 
 
 @dataclass
@@ -47,16 +70,20 @@ class Fetched:
 
 @dataclass
 class Fetcher:
-    timeout: float = 30.0
+    timeout: float = 45.0
     per_host_delay: float = 1.0
     retries: int = 2
     _last: dict = field(default_factory=dict)
     _insecure_hosts: set = field(default_factory=set)
+    _legacy_hosts: set = field(default_factory=set)
     stats: dict = field(default_factory=lambda: {"requests": 0, "errors": 0, "tls_fallbacks": 0})
 
     def __post_init__(self):
         self.s = requests.Session()
         self.s.headers.update({"User-Agent": UA, "Accept-Language": "en-IN,en;q=0.9,hi;q=0.8"})
+        self.legacy = requests.Session()
+        self.legacy.headers.update(self.s.headers)
+        self.legacy.mount("https://", LegacyTLSAdapter())
 
     def _polite(self, url: str):
         h = host(url)
@@ -72,6 +99,9 @@ class Fetcher:
             return out
         verify = host(url) not in self._insecure_hosts
         for attempt in range(self.retries + 1):
+            sess = self.legacy if host(url) in self._legacy_hosts else self.s
+            if sess is self.legacy:
+                verify = False
             self._polite(url)
             self.stats["requests"] += 1
             t0 = time.time()
@@ -79,15 +109,15 @@ class Fetcher:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
                     if head_only:
-                        r = self.s.head(url, timeout=self.timeout, allow_redirects=True, verify=verify)
+                        r = sess.head(url, timeout=self.timeout, allow_redirects=True, verify=verify)
                         if r.status_code in (403, 405, 501) or r.status_code >= 500:
                             # many government servers reject HEAD; fall back to a small GET
-                            r = self.s.get(url, timeout=self.timeout, allow_redirects=True,
+                            r = sess.get(url, timeout=self.timeout, allow_redirects=True,
                                            verify=verify, stream=True)
                             r.close()
                     else:
-                        r = self.s.get(url, timeout=self.timeout, allow_redirects=True,
-                                       verify=verify, stream=True)
+                        r = sess.get(url, timeout=self.timeout, allow_redirects=True,
+                                     verify=verify, stream=True)
                         chunks, size = [], 0
                         for chunk in r.iter_content(65536):
                             size += len(chunk)
@@ -119,6 +149,10 @@ class Fetcher:
                     verify = False
                     self._insecure_hosts.add(host(url))
                     self.stats["tls_fallbacks"] += 1
+                    continue
+                if host(url) not in self._legacy_hosts:
+                    # Still failing: the server only speaks old TLS. Try once more with legacy settings.
+                    self._legacy_hosts.add(host(url))
                     continue
                 out.error, out.error_code = f"TLS error: {e}"[:300], "TLS"
             except requests.exceptions.Timeout:

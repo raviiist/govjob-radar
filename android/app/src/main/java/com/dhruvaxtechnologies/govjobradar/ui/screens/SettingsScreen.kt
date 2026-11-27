@@ -85,11 +85,15 @@ fun SettingsScreen(nav: NavHostController) {
                     .putExtra(Intent.EXTRA_TEXT, "GovJob Radar – Central, State and Deputation government vacancies, " +
                         "updated every night from official websites: $link"), "Share app").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
+            val isAdminNow = adminEmail != null && app.admin.isAdmin()
             Row("Official sources (${feed.sources.size})", "Websites checked every night") { }
             feed.sources.sortedBy { it.name }.forEach { s ->
-                Text("• ${s.name}${s.state?.let { " ($it)" } ?: ""}", Modifier.fillMaxWidth().clickable { openUrl(ctx, s.home) }
-                    .padding(horizontal = 24.dp, vertical = 4.dp), style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary)
+                // Names only for users; the developer (admin) can open the websites.
+                val canOpen = isAdminNow
+                val rowMod = if (canOpen) Modifier.fillMaxWidth().clickable { openUrl(ctx, s.home) } else Modifier.fillMaxWidth()
+                Text("• ${s.name}${s.state?.let { " ($it)" } ?: ""}", rowMod.padding(horizontal = 24.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (canOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
             }
             var taps by remember { mutableStateOf(0) }
             Text("Version ${BuildConfig.VERSION_NAME}", Modifier.fillMaxWidth().clickable { taps++ }.padding(16.dp),

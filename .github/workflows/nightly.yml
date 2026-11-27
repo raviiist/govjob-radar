@@ -32,7 +32,7 @@ jobs:
     # (Oracle Cloud, Mumbai — see server/oracle-runner-setup.sh). If that server is down the job waits
     # and Admin > Health turns red after 30 h.
     runs-on: ${{ (inputs.on_github || vars.CRAWL_ON_GITHUB == 'true') && 'ubuntu-latest' || 'self-hosted' }}
-    timeout-minutes: 170
+    timeout-minutes: 330
     env:
       FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -44,11 +44,16 @@ jobs:
         run: |
           python3 -m venv "$HOME/.gjr-venv"
           "$HOME/.gjr-venv/bin/pip" install -q --upgrade pip
-          "$HOME/.gjr-venv/bin/pip" install -q -r server/requirements.txt pytest lxml
+          "$HOME/.gjr-venv/bin/pip" install -q -r server/requirements.txt pytest lxml playwright
           echo "$HOME/.gjr-venv/bin" >> "$GITHUB_PATH"
+          # Headless browser for JavaScript websites (downloaded once, then cached on the server)
+          "$HOME/.gjr-venv/bin/python" -m playwright install chromium || echo "::warning::browser download failed"
+          if sudo -n true 2>/dev/null; then sudo "$HOME/.gjr-venv/bin/python" -m playwright install-deps chromium || true; fi
       - name: Self-test
         run: python -m pytest -q server/tests
       - name: Crawl
+        env:
+          RUN_EVENT: ${{ github.event_name }}
         run: python server/run_nightly.py ${{ inputs.only && format('--only {0}', inputs.only) || '' }}
       - name: Report failure to Admin tab
         if: failure()

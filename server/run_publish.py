@@ -40,7 +40,8 @@ def main():
     ap.add_argument("--force", action="store_true", help="publish even if the feed shrank a lot")
     a = ap.parse_args()
 
-    cfg = yaml.safe_load((HERE / "config" / "sources.yaml").read_text())
+    from govjob.sources import load as load_sources
+    cfg = load_sources(HERE / "config" / "sources.yaml")
     store = MemoryStore(a.state_file) if a.dry_run else FirestoreStore()
     jobs = store.load_jobs()
     feed, meta = publish.build(jobs, cfg)

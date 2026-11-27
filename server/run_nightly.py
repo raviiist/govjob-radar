@@ -31,17 +31,33 @@ def main():
     ap.add_argument("--state-file", default=str(HERE / "local-state.json"))
     ap.add_argument("--no-ai", action="store_true")
     ap.add_argument("--only", nargs="*", help="source ids to crawl")
+    ap.add_argument("--no-render", action="store_true", help="do not use the headless browser")
     a = ap.parse_args()
 
-    cfg = yaml.safe_load((HERE / "config" / "sources.yaml").read_text())
-    ids = [s["id"] for s in cfg["sources"]]
-    dup = {i for i in ids if ids.count(i) > 1}
-    if dup:
-        sys.exit(f"duplicate source ids in sources.yaml: {dup}")
+    from govjob.sources import load as load_sources
+    cfg = load_sources(HERE / "config" / "sources.yaml")
 
     store = MemoryStore(a.state_file) if a.dry_run else FirestoreStore()
+    # GitHub's own timer is a late backup for the India server's schedule: skip if the crawl already ran.
+    if os.environ.get("RUN_EVENT") == "schedule" and not a.only:
+        from datetime import datetime, timezone
+        last = store.get_status("server").get("last_success")
+        try:
+            hours = (datetime.now(timezone.utc) - datetime.fromisoformat(last)).total_seconds() / 3600
+        except (TypeError, ValueError):
+            hours = 999
+        if hours < 14:
+            print(f"Crawl already done {hours:.1f} h ago (started by the India server) - skipping this late GitHub run.")
+            return
     gem = None if a.no_ai else Gemini(max_calls=int(os.environ.get("AI_MAX_CALLS", "300")))
-    stats = Nightly(store, cfg, gem, run_url=run_url()).run(only=a.only)
+    from govjob.render import Renderer
+    renderer = Renderer(enabled=not a.no_render)
+    try:
+        stats = Nightly(store, cfg, gem, run_url=run_url(), renderer=renderer).run(only=a.only)
+    finally:
+        renderer.close()
+    print(f"pages rendered with the headless browser: {renderer.pages}" +
+          (f" (browser unavailable: {renderer.error})" if renderer.error else ""))
     print({k: v for k, v in stats.__dict__.items() if k != "errors"})
 
 

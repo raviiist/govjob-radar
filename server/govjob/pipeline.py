@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 from . import ai as ai_mod
 from .extract import (CORRIGENDUM_WORDS, Link, candidate_notices, html_to_text, is_pdf_url,
                       links_of, listing_link_candidates, pdf_to_text, JOB_WORDS)
-from .http import Fetcher
+from .http import Fetched, Fetcher
 from .util import IST, date_mentioned, dates_in, domain_allowed, iso, now_utc, parse_date
 from .verify import build_job, check, match_corrigendum, reasons_block_extension
 
@@ -60,7 +60,7 @@ class RunStats:
 
 class Nightly:
     def __init__(self, store, sources_cfg: dict, gemini: ai_mod.Gemini | None, fetcher: Fetcher | None = None,
-                 run_url: str | None = None, today: date | None = None):
+                 run_url: str | None = None, today: date | None = None, renderer=None):
         self.store = store
         self.cfg = sources_cfg
         self.defaults = sources_cfg.get("defaults", {})
@@ -72,6 +72,7 @@ class Nightly:
         self.stats = RunStats()
         self.settings = store.get_settings()
         self.ai_stopped_reason: str | None = None
+        self.renderer = renderer          # headless browser for JavaScript sites (optional)
 
     # ------------------------------------------------------------------ helpers
     def flag(self, code, msg, **kw):
@@ -141,7 +142,7 @@ class Nightly:
         finished = now_utc()
         s = self.stats
         self.store.set_status("server", {
-            "state": "ok", "last_run_finished": iso(finished), "last_success": iso(finished),
+            "state": "ok", "last_run_finished": iso(finished), **({} if only else {"last_success": iso(finished)}),
             "duration_min": round((finished - started).total_seconds() / 60, 1),
             "model": ", ".join(getattr(self.ai, "models", [self.ai.model])) if self.ai else None, "ai_calls": self.ai.calls if self.ai else 0,
             "ai_calls_by_model": dict(getattr(self.ai, "calls_by_model", {})) if self.ai else {},
@@ -152,8 +153,15 @@ class Nightly:
         return s
 
     # ------------------------------------------------------------------ crawling
-    def _try_listing(self, url: str):
-        f = self.fetch.get(url)
+    def _try_listing(self, url: str, render: bool = False):
+        if render:
+            r = self.renderer.html(url) if self.renderer else None
+            if r is None:
+                return Fetched(url=url, error="could not render", error_code="RENDER"), [], []
+            final, html = r
+            f = Fetched(url=url, final_url=final, status=200, content_type="text/html", content=html.encode())
+        else:
+            f = self.fetch.get(url)
         if not f.ok or f.is_pdf:
             return f, [], []
         links = links_of(f.text(), f.final_url or url)
@@ -174,7 +182,8 @@ class Nightly:
             st["added_at"] = iso(now_utc())
             self.store.set_source(sid, {"added_at": st["added_at"], "name": src["name"]})
         order, seen_urls = [], set()
-        for u in list(st.get("listing_urls") or [st.get("listing_url")]) + list(src.get("hints", [])) + [src["home"]]:
+        for u in (list(st.get("listing_urls") or [st.get("listing_url")]) + list(src.get("hints", []))
+                  + list(st.get("extra_pages") or []) + [src["home"]]):
             if u and u not in seen_urls:
                 order.append(u)
                 seen_urls.add(u)
@@ -184,9 +193,9 @@ class Nightly:
         cands, pages_ok, home_fetch, last_fetch, by_key = [], [], None, None, {}
         max_pages = int(self.defaults.get("max_listing_pages", 6))
 
-        def take(url):
+        def take(url, render=False):
             nonlocal last_fetch
-            f, links, c = self._try_listing(url)
+            f, links, c = self._try_listing(url, render)
             last_fetch = f
             if c:
                 pages_ok.append(url)
@@ -219,9 +228,37 @@ class Nightly:
                 take(l.url)
                 if len(pages_ok) > before and l.url not in (st.get("listing_urls") or []):
                     rediscovered = True
+        # Site opened but nothing found: it probably builds its pages with JavaScript. Read it with the
+        # headless browser (also straight away on later nights once we know the site needs it).
+        used_js = False
+        if (not by_key and hf.ok) or st.get("needs_js"):
+            if self.renderer and self.renderer.available:
+                used_js = True
+                rendered = 0
+                for u in order:
+                    if rendered >= 4 or len(pages_ok) >= max_pages:
+                        break
+                    rendered += 1
+                    f, links = take(u, render=True)
+                    if u == src["home"] and links:
+                        for l in listing_link_candidates(links)[:6]:
+                            if rendered >= 6 or len(pages_ok) >= max_pages:
+                                break
+                            if l.url in seen_urls or not domain_allowed(l.url, src["home"], src.get("domains", []),
+                                                                         self.suffixes):
+                                continue
+                            seen_urls.add(l.url)
+                            rendered += 1
+                            take(l.url, render=True)
+            elif self.renderer is not None and not st.get("needs_js"):
+                self.flag("RENDER_UNAVAILABLE", f"Headless browser not available, JavaScript sites cannot be read: "
+                          f"{self.renderer.error}", severity="warning",
+                          hint="Run the server setup script again (installs the browser's system libraries).")
         cands = [v[0] for v in by_key.values()]
         page_of = {k: v[1] for k, v in by_key.items()}
         used_url = pages_ok[0] if pages_ok else None
+        if used_js and cands:
+            self.store.set_source(sid, {"needs_js": True})
 
         if not cands:
             fails = int(st.get("fail_count", 0)) + 1
@@ -303,6 +340,11 @@ class Nightly:
         page_url = f.final_url or url
         html = f.text()
         page_text = html_to_text(html)
+        if len(page_text) < 300 and self.renderer and self.renderer.available:
+            r = self.renderer.html(page_url)
+            if r:
+                page_url, html = r
+                page_text = html_to_text(html)
         pdfs = []
         for l in links_of(html, page_url):
             if not is_pdf_url(l.url) or l.url in [p.url for p in pdfs]:
@@ -376,6 +418,7 @@ class Nightly:
         if decision == "drop":
             self.stats.dropped += 1
             print(f"  skipped: {job['title'][:90]} | {'; '.join(reasons)}", flush=True)
+            self._maybe_listing_page(src, b, link)
             return True
         existing = self.store.jobs.get(job["id"])
         if existing:
@@ -415,6 +458,19 @@ class Nightly:
             job["closed_at"] = None
         self.store.put_job(job)
         self.stats.extensions += 1
+
+    def _maybe_listing_page(self, src: dict, b: "Bundle", link: Link):
+        """A 'notice' that is really a page listing several notices (e.g. "CEN Notifications List"):
+        remember it as an extra listing page so its notices are read from now on."""
+        if not b.detail_url or not re.search(r"list|notices|notifications|advertisements|portal|vacancies|recruitments",
+                                             link.text, re.I):
+            return
+        st = self.store.get_source(src["id"])
+        extra = list(st.get("extra_pages") or [])
+        if b.detail_url not in extra:
+            extra = (extra + [b.detail_url])[-8:]
+            self.store.set_source(src["id"], {"extra_pages": extra})
+            print(f"  -> will also read notices listed on {b.detail_url}", flush=True)
 
     def _pending_extension(self, target: dict, new_date: str, notice_url: str, score: float, verified: bool,
                            why: str):
