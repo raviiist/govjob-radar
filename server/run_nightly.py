@@ -56,7 +56,7 @@ def main():
         stats = Nightly(store, cfg, gem, run_url=run_url(), renderer=renderer).run(only=a.only)
     finally:
         renderer.close()
-    print(f"pages rendered with the headless browser: {renderer.pages}" +
+    print(f"pages rendered with the headless browser: {renderer.pages} (failed: {renderer.failures})" +
           (f" (browser unavailable: {renderer.error})" if renderer.error else ""))
     print({k: v for k, v in stats.__dict__.items() if k != "errors"})
 
